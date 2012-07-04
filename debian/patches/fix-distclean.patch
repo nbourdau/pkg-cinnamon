@@ -1,0 +1,11 @@
+--- a/files/Makefile.in
++++ b/files/Makefile.in
+@@ -2,6 +2,8 @@
+ 
+ clean:
+ 
++distclean:
++
+ install:
+ 	find -mindepth 1 -maxdepth 1 -type d -exec cp -R {} $(DESTDIR)/ \;
+ 
