@@ -130,7 +130,8 @@ class ThemeViewSidePage (SidePage):
         scrolledWindow = Gtk.ScrolledWindow()   
         cinnamon_theme_vbox.pack_start(scrolledWindow, True, True, 2)
         
-        iconView = Gtk.IconView()     
+        iconView = Gtk.IconView()    
+        iconView.set_columns(4)
         iconView.set_item_padding(2)  
         iconView.set_row_spacing(2)
         self.model = Gtk.ListStore(str, GdkPixbuf.Pixbuf)
@@ -536,7 +537,7 @@ class GSettingsSpinButton(Gtk.HBox):
         
         self.content_widget.set_range(min, max)
         self.content_widget.set_increments(step, page)
-        self.content_widget.set_editable(False)
+        #self.content_widget.set_editable(False)
         
         self.settings = Gio.Settings.new(schema)        
         self.content_widget.set_value(self.settings.get_int(self.key))
@@ -686,7 +687,7 @@ class GSettingsRangeSpin(Gtk.HBox):
 
         self.content_widget.set_range(_min, _max)
         self.content_widget.set_increments(_increment, _increment)
-        self.content_widget.set_editable(False)
+        #self.content_widget.set_editable(False)
         self.content_widget.set_digits(1)
         self.content_widget.set_value(self.settings.get_double(self.key))
 
@@ -861,10 +862,10 @@ class ChangeTimeWidget(Gtk.HBox):
         self.minSpin.configure(minAdj, 0.5, 0)
         self.yearSpin.configure(yearAdj, 0.5, 0)
         self.daySpin.configure(dayAdj, 0.5, 0)
-        self.hourSpin.set_editable(False)
-        self.minSpin.set_editable(False)
-        self.yearSpin.set_editable(False)
-        self.daySpin.set_editable(False)
+        #self.hourSpin.set_editable(False)
+        #self.minSpin.set_editable(False)
+        #self.yearSpin.set_editable(False)
+        #self.daySpin.set_editable(False)
         
         self.update_time()
         GObject.timeout_add(1000, self.update_time)
