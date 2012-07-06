@@ -1,3 +1,12 @@
+Description: Disable bluetooth applet
+ This patch disable temporarily the bluetooh applet. Cinnamon is indeed
+ weirdly linked against libgnome-bluetooth-applet.so which makes building
+ the package failing. It is disable the time a correct fix is found.
+Author: Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
+Origin: vendor
+Forwarded: not-needed
+Last-Update: 2012-07-06
+
 --- a/configure.ac
 +++ b/configure.ac
 @@ -125,18 +125,9 @@
