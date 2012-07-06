@@ -1,0 +1,18 @@
+Description: Install GObjectIntrospection files at install
+Author: Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
+Origin: vendor
+Forwarded: no
+Last-Update: 2012-07-06
+
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -16,6 +16,9 @@
+ typelibdir = $(pkglibdir)
+ typelib_DATA = $(INTROSPECTION_GIRS:.gir=.typelib)
+ 
++girdir = $(pkglibdir)
++gir_DATA = $(INTROSPECTION_GIRS)
++
+ servicedir = $(datadir)/dbus-1/services
+ service_DATA = $(service_in_files:.service.in=.service)
+ 
