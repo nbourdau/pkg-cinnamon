@@ -71,30 +71,24 @@ Depends: ${gir:Depends},
          mesa-utils
 Recommends: gnome-control-center, gnome-user-guide, gnome-themes-standard, gnome-session-fallback
 Breaks: gnome-control-center (<< 1:3.0)
-Description: Cinnamon desktop
- Cinnamon redefines user interactions with the GNOME desktop.
- In particular, it offers new paradigms for launching applications,
- accessing documents, and organizing open windows in GNOME. Later, it
- will introduce a new applets eco-system and offer new solutions for
- other desktop features, such as notifications and contacts
- management. Cinnamon is intended to replace functions handled
- by the GNOME Panel and by the window manager in previous versions of
- GNOME. Cinnamon has rich visual effects enabled by new
- graphical technologies.
+Description: Innovative and comfortable desktop
+ Cinnamon is a desktop environment which provides advanced innovative
+ features and a traditional user experience.
+ .
+ The desktop layout is similar to GNOME 2.  The underlying technology is
+ forked from gnome-shell.  The emphasis is put on making users feel at home
+ and providing them with an easy to use and comfortable desktop experience.
 
 Package: cinnamon-common
 Architecture: all
 Depends: ${misc:Depends},
-Description: Cinnamon desktop (Common data files)
- Cinnamon redefines user interactions with the GNOME desktop.
- In particular, it offers new paradigms for launching applications,
- accessing documents, and organizing open windows in GNOME. Later, it
- will introduce a new applets eco-system and offer new solutions for
- other desktop features, such as notifications and contacts
- management. Cinnamon is intended to replace functions handled
- by the GNOME Panel and by the window manager in previous versions of
- GNOME. Cinnamon has rich visual effects enabled by new
- graphical technologies.
+Description: Innovative and comfortable desktop (Common data files)
+ Cinnamon is a desktop environment which provides advanced innovative
+ features and a traditional user experience.
+ .
+ The desktop layout is similar to GNOME 2.  The underlying technology is
+ forked from gnome-shell.  The emphasis is put on making users feel at home
+ and providing them with an easy to use and comfortable desktop experience.
  .
  This package contains the data files needed by Cinnamon
 
@@ -103,15 +97,12 @@ section: debug
 Priority: extra
 Architecture: any
 Depends: cinnamon (= ${binary:Version}), ${misc:Depends}
-Description: Cinnamon desktop (Debugging symbols)
- Cinnamon redefines user interactions with the GNOME desktop.
- In particular, it offers new paradigms for launching applications,
- accessing documents, and organizing open windows in GNOME. Later, it
- will introduce a new applets eco-system and offer new solutions for
- other desktop features, such as notifications and contacts
- management. Cinnamon is intended to replace functions handled
- by the GNOME Panel and by the window manager in previous versions of
- GNOME. Cinnamon has rich visual effects enabled by new
- graphical technologies.
+Description: Innovative and comfortable desktop (Debugging symbols)
+ Cinnamon is a desktop environment which provides advanced innovative
+ features and a traditional user experience.
+ .
+ The desktop layout is similar to GNOME 2.  The underlying technology is
+ forked from gnome-shell.  The emphasis is put on making users feel at home
+ and providing them with an easy to use and comfortable desktop experience.
  .
  This package contains the debugging symbols.
