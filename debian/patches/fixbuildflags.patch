@@ -1,0 +1,52 @@
+Description: Fix how link dependencies are specified
+ Several target have their dependencies incorrectly reported in _LDFLAGS
+ variables instead of _LIBADD or _LDADD. AS a result, the link flag
+ -Wl,--as-needed is misplaced making it useless. This patch sanetizes this
+ a little bit.
+Author: Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
+Origin: vendor
+Forwarded: no
+Last-Update: 2012-07-06
+
+--- a/src/Makefile-calendar-server.am
++++ b/src/Makefile-calendar-server.am
+@@ -18,7 +18,7 @@
+ 	$(CALENDAR_SERVER_CFLAGS)		\
+ 	$(NULL)
+ 
+-cinnamon_calendar_server_LDFLAGS =		\
++cinnamon_calendar_server_LDADD =		\
+ 	$(CALENDAR_SERVER_LIBS)			\
+ 	$(NULL)
+ 
+--- a/src/Makefile-hotplug-sniffer.am
++++ b/src/Makefile-hotplug-sniffer.am
+@@ -15,7 +15,7 @@
+ 	$(CINNAMON_HOTPLUG_SNIFFER_CFLAGS)		\
+ 	$(NULL)
+ 
+-cinnamon_hotplug_sniffer_LDFLAGS =		\
++cinnamon_hotplug_sniffer_LDADD =		\
+ 	$(CINNAMON_HOTPLUG_SNIFFER_LIBS)		\
+ 	$(NULL)
+ 
+--- a/src/Makefile-st.am
++++ b/src/Makefile-st.am
+@@ -175,7 +175,6 @@
+ 	$(st_built_sources)			\
+ 	$(NULL)
+ libst_1_0_la_CPPFLAGS = $(st_cflags)
+-libst_1_0_la_LDFLAGS = $(LDADD)
+ 
+ noinst_PROGRAMS += test-theme
+ 
+--- a/src/Makefile-tray.am
++++ b/src/Makefile-tray.am
+@@ -49,7 +49,6 @@
+ 	$(tray_built_sources)	\
+ 	$(NULL)
+ libtray_la_CPPFLAGS = $(tray_cflags)
+-libtray_la_LDFLAGS = $(LDADD)
+ 
+ CLEANFILES += $(TRAY_STAMP_FILES) $(BUILT_SOURCES)
+ 

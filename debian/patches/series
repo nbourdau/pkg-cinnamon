@@ -1,2 +1,3 @@
 fix-distclean.patch
 disable-bluetooth-applet.patch
+fixbuildflags.patch
