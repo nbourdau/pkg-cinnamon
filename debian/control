@@ -47,10 +47,10 @@ Homepage: http://cinnamon.linuxmint.com
 
 Package: cinnamon
 Architecture: any
+Pre-Depends: ${misc:Pre-Depends}
 Depends: ${gir:Depends},
          ${shlibs:Depends},
          ${misc:Depends},
-         ${icon-theme:Depends},
          cinnamon-common (= ${source:Version}), 
          gjs (>= 1.29.18),
          caribou,
@@ -81,7 +81,7 @@ Description: Innovative and comfortable desktop
 
 Package: cinnamon-common
 Architecture: all
-Depends: ${misc:Depends},
+Depends: ${misc:Depends}
 Description: Innovative and comfortable desktop (Common data files)
  Cinnamon is a desktop environment which provides advanced innovative
  features and a traditional user experience.
