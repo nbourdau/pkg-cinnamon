@@ -5,6 +5,7 @@ Maintainer: Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
 Build-Depends: debhelper (>= 9),
                dh-autoreconf,
                gnome-pkg-tools (>= 0.11),
+               gnome-common,
                intltool,
                libgjs-dev (>= 1.29.18),
                gvfs-backends,
