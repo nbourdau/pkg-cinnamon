@@ -1,0 +1,17 @@
+Description: Make some .desktop files standard compliant
+Author: Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
+Origin: vendor
+Forwarded: no
+Last-Update: 2012-07-24
+
+--- a/data/cinnamon.desktop.in.in
++++ b/data/cinnamon.desktop.in.in
+@@ -7,7 +7,7 @@
+ X-GNOME-Bugzilla-Product=cinnamon
+ X-GNOME-Bugzilla-Component=general
+ X-GNOME-Bugzilla-Version=@VERSION@
+-Categories=GNOME;GTK;Core;
++Categories=GNOME;GTK;System;Core;
+ OnlyShowIn=GNOME;
+ NoDisplay=true
+ X-GNOME-Autostart-Phase=WindowManager
