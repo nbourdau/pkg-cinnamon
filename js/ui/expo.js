@@ -8,6 +8,7 @@ const St = imports.gi.St;
 const Cinnamon = imports.gi.Cinnamon;
 const Gdk = imports.gi.Gdk;
 
+const DND = imports.ui.dnd;
 const Main = imports.ui.main;
 const MessageTray = imports.ui.messageTray;
 const Params = imports.misc.params;
@@ -118,7 +119,7 @@ Expo.prototype = {
 
         this.visible = false;           // animating to overview, in overview, animating out
         this._shown = false;            // show() and not hide()
-        this._shownTemporarily = false; // showTemporarily() and not hideTemporarily()
+        this._shownTemporarily = false; // showTemporarily() and not hilog("huasuhashusu");deTemporarily()
         this._modal = false;            // have a modal grab
         this.animationInProgress = false;
         this._hideInProgress = false;
@@ -128,7 +129,7 @@ Expo.prototype = {
         // Dash elements, or mouseover handlers in the workspaces.
 
         this._gradient = new St.Button({reactive: false});
-        this._gradient.set_style("background-gradient-end: #AAA;background-gradient-start: #000;background-gradient-direction: vertical;");
+        this._gradient.set_style_class_name("expo-background");
         this._group.add_actor(this._gradient);
         this._coverPane = new Clutter.Rectangle({ opacity: 0,
                                                   reactive: true });
@@ -137,18 +138,28 @@ Expo.prototype = {
 
         this._addWorkspaceButton = new St.Button({style_class: 'workspace-add-button'});
         this._group.add_actor(this._addWorkspaceButton);
-        this._addWorkspaceButton.opacity = 160;
         this._addWorkspaceButton.connect('clicked', Lang.bind(this, function () { Main._addWorkspace();}));
-        this._addWorkspaceButton.connect('enter-event', Lang.bind(this, function () { 
-                Tweener.addTween(this._addWorkspaceButton, { opacity: 255,
-                                                             time: ADD_BUTTON_HOVER_TIME,
-                                                             transition: 'easeOutQuad'});
-                                                                                        }));
-        this._addWorkspaceButton.connect('leave-event', Lang.bind(this, function () { 
-                Tweener.addTween(this._addWorkspaceButton, { opacity: 160,
-                                                             time: ADD_BUTTON_HOVER_TIME,
-                                                             transition: 'easeOutQuad'});
-                                                                                        }));
+
+        this._windowCloseArea = new St.Button({style_class: 'window-close-area'});
+        this._windowCloseArea.handleDragOver = function(source, actor, x, y, time) {
+                return DND.DragMotionResult.MOVE_DROP;
+            };
+        this._windowCloseArea.acceptDrop = function(source, actor, x, y, time) {
+                
+                if (source.realWindow) {
+                    let win = source.realWindow;
+
+                    let metaWindow = win.get_meta_window();
+                    
+                    source._draggable._restoreOnSuccess = false;
+                    metaWindow.delete(global.get_current_time());
+                    return true;
+                }
+                return false;
+            };
+
+        this._windowCloseArea._delegate = this._windowCloseArea;
+        this._group.add_actor(this._windowCloseArea);
 
         this._group.hide();
         global.overlay_group.add_actor(this._group);
@@ -156,13 +167,28 @@ Expo.prototype = {
         this._gradient.hide();
         this._coverPane.hide();
         this._addWorkspaceButton.hide();
+        this._windowCloseArea.hide();
 
-        this._windowSwitchTimeoutId = 0;
-        this._windowSwitchTimestamp = 0;
-        this._lastActiveWorkspaceIndex = -1;
-        this._lastHoveredWindow = null;
         this._needsFakePointerEvent = false;
-        this._globalKeyPressHandler = 0;
+
+        global.stage.connect('key-press-event',
+            Lang.bind(this, function(actor, event) {
+                if (this._shown) {
+                    if (this._expo.handleKeyPressEvent(actor, event)) {
+                        return true;
+                    }
+                    let symbol = event.get_key_symbol();
+                    if (symbol === Clutter.Escape) {
+                        this.hide();
+                        return true;
+                    }
+                    if (symbol === Clutter.plus || symbol === Clutter.Insert) {
+                        Main._addWorkspace();
+                        return true;
+                    }
+                }
+                return false;
+            }));
     },
 
     // The members we construct that are implemented in JS might
@@ -213,6 +239,8 @@ Expo.prototype = {
         this._group.set_position(primary.x, primary.y);
         this._group.set_size(primary.width, primary.height);
 
+        this._group.set_clip(primary.x, primary.y, primary.width, primary.height);
+
         this._gradient.set_position(0, 0);
         this._gradient.set_size(primary.width, primary.height);
 
@@ -228,6 +256,10 @@ Expo.prototype = {
         let buttonWidth = node.get_length('width');
         let buttonHeight = node.get_length('height');
 
+        node = this._windowCloseArea.get_theme_node();
+        this._windowCloseArea.height = node.get_length('height');
+        this._windowCloseArea.width = node.get_length('width');
+
         this._expo.actor.set_position(0, 0);
         this._expo.actor.set_size((primary.width - buttonWidth), primary.height);
 
@@ -237,6 +269,26 @@ Expo.prototype = {
         this._addWorkspaceButton.set_size(buttonWidth, buttonHeight); 
         if (this._addWorkspaceButton.get_theme_node().get_background_image() == null)
             this._addWorkspaceButton.set_style('background-image: url("/usr/share/cinnamon/theme/add-workspace.png");'); 
+
+        this._windowCloseArea.set_position((primary.width - this._windowCloseArea.width) / 2 , primary.height);
+        this._windowCloseArea.set_size(this._windowCloseArea.width, this._windowCloseArea.height);
+        this._windowCloseArea.raise_top();
+    },
+
+    showCloseArea : function() {
+        let primary = Main.layoutManager.primaryMonitor;
+        this._windowCloseArea.show();
+        Tweener.addTween(this._windowCloseArea, {   y: primary.height - this._windowCloseArea.height,
+                                                    time: ANIMATION_TIME,
+                                                    transition: 'easeOutQuad'});
+    },
+
+    hideCloseArea : function() {
+        let primary = Main.layoutManager.primaryMonitor;
+        Tweener.addTween(this._windowCloseArea, {   y: primary.height,
+                                                    time: ANIMATION_TIME,
+                                                    transition: 'easeOutQuad',
+                                                    onComplete: this.hide});
     },
 
     //// Public methods ////
@@ -251,6 +303,15 @@ Expo.prototype = {
 
     endWindowDrag: function(source) {
         this.emit('window-drag-end');
+    },
+
+    _createClone: function(source) {
+        if (this.clone) {
+            this._group.remove_actor(this.clone);
+            this.clone.destroy();
+        }
+        this.clone = new Clutter.Clone({source: source});
+        this._group.add_actor(this.clone);
     },
 
     // show:
@@ -299,12 +360,11 @@ Expo.prototype = {
 
         this.allocateID = this.activeWorkspace.connect('allocated', Lang.bind(this, this._animateVisible2));
 
-        this.clone = new Clutter.Clone({source: activeWorkspaceActor});
+        this._createClone(activeWorkspaceActor);
         if (global.settings.get_string("desktop-layout") != 'traditional' && !global.settings.get_boolean("panel-autohide"))
             this.clone.set_position(0, Main.panel.actor.height); 
 
         this.clone.show();
-        this._group.add_actor(this.clone);
 
         this._gradient.show();
         
@@ -479,8 +539,7 @@ Expo.prototype = {
         let activeWorkspaceActor = this.activeWorkspace.actor;
         //this.activeWorkspace._fadeInUninterestingWindows();
         this.activeWorkspace._overviewModeOff();
-        this.clone = new Clutter.Clone({source: activeWorkspaceActor});
-        this._group.add_actor(this.clone);
+        this._createClone(activeWorkspaceActor);
         this.clone.set_position(activeWorkspaceActor.allocation.x1, activeWorkspaceActor.allocation.y1);
         this.clone.set_scale(activeWorkspaceActor.get_scale()[0], activeWorkspaceActor.get_scale()[1]);
         this.clone.show();
@@ -521,6 +580,7 @@ Expo.prototype = {
 
         this._expo.hide();
         this._addWorkspaceButton.hide();
+        this._windowCloseArea.hide();
 
         this._background.hide();
         this._group.hide();

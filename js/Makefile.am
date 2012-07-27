@@ -2,11 +2,6 @@
 jsdir = $(pkgdatadir)/js
 
 nobase_dist_js_DATA = \
-	gdm/batch.js		\
-	gdm/consoleKit.js	\
-	gdm/fingerprint.js	\
-	gdm/loginDialog.js	\
-	gdm/powerMenu.js	\
 	misc/config.js		\
 	misc/docInfo.js		\
 	misc/fileUtils.js	\
@@ -27,6 +22,7 @@ nobase_dist_js_DATA = \
 	ui/boxpointer.js	\
 	ui/calendar.js		\
 	ui/dnd.js		\
+	ui/edgeFlip.js  	\
 	ui/endSessionDialog.js	\
 	ui/environment.js	\
 	ui/expo.js		\
@@ -66,7 +62,6 @@ nobase_dist_js_DATA = \
 	ui/windowAttentionHandler.js	\
 	ui/windowManager.js	\
 	ui/workspace.js		\
-	ui/workspaceThumbnail.js	\
 	ui/workspacesView.js	\
 	ui/xdndHandler.js
 	

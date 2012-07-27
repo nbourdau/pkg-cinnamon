@@ -22,7 +22,7 @@
     </key>
     
     <key name="enabled-applets" type="as">
-      <default>['panel1:left:0:menu@cinnamon.org', 'panel1:left:1:show-desktop@cinnamon.org', 'panel1:left:2:panel-launchers@cinnamon.org', 'panel1:left:3:window-list@cinnamon.org', 'panel1:right:0:removable-drives@cinnamon.org', 'panel1:right:1:keyboard@cinnamon.org', 'panel1:right:2:settings@cinnamon.org', 'panel1:right:3:bluetooth@cinnamon.org', 'panel1:right:4:network@cinnamon.org', 'panel1:right:5:sound@cinnamon.org', 'panel1:right:6:power@cinnamon.org', 'panel1:right:7:systray@cinnamon.org', 'panel1:right:8:calendar@cinnamon.org']</default>
+      <default>['panel1:left:0:menu@cinnamon.org', 'panel1:left:1:show-desktop@cinnamon.org', 'panel1:left:2:panel-launchers@cinnamon.org', 'panel1:left:3:window-list@cinnamon.org', 'panel1:right:0:removable-drives@cinnamon.org', 'panel1:right:1:keyboard@cinnamon.org', 'panel1:right:2:bluetooth@cinnamon.org', 'panel1:right:3:network@cinnamon.org', 'panel1:right:4:sound@cinnamon.org', 'panel1:right:5:power@cinnamon.org', 'panel1:right:6:systray@cinnamon.org', 'panel1:right:7:calendar@cinnamon.org', 'panel1:right:8:windows-quick-list@cinnamon.org']</default>
       <_summary>Uuids of applets to enable</_summary>
       <_description>
         Cinnamon applets have a uuid property; this key lists applets
@@ -38,11 +38,55 @@
       </_description>
     </key>
     
+    <key type="i" name="panel-show-delay">
+      <default>0</default>
+      <summary>Duration of the delay before a hidden panel is shown</summary>
+      <description>Duration of the delay (in milliseconds)</description>
+    </key>
+    
+    <key type="i" name="panel-hide-delay">
+      <default>0</default>
+      <summary>Duration of the delay before a shown panel is hidden</summary>
+      <description>Duration of the delay (in milliseconds)</description>
+    </key>
+    
+    <key name="panel-resizable" type="b">
+      <default>false</default>
+      <_summary>Resizable panel</_summary>
+      <_description>
+        Whether the panel uses a user-defined height
+      </_description>
+    </key>
+    
+    <key name="panel-top-height" type="i">
+      <default>25</default>
+      <_summary>Panel size</_summary>
+      <_description>
+        User-defined panel-height for top panel
+      </_description>
+    </key>
+    
+    <key name="panel-bottom-height" type="i">
+      <default>25</default>
+      <_summary>Panel size</_summary>
+      <_description>
+        User-defined panel-height for bottom panel
+      </_description>
+    </key>
+    
     <key name="desktop-effects" type="b">
       <default>true</default>
       <_summary>Enable desktop effects</_summary>
       <_description>
         Whether to enable desktop effects and window animations.
+      </_description>
+    </key>
+    
+    <key name="desktop-effects-on-dialogs" type="b">
+      <default>false</default>
+      <_summary>Enable desktop effects on dialog boxes</_summary>
+      <_description>
+        Whether to enable desktop effects on dialog boxes.
       </_description>
     </key>
     
@@ -207,6 +251,35 @@
       </_description>
     </key>
 
+    <key type="b" name="activate-menu-applet-on-hover">
+      <default>false</default>
+      <_summary>Enable or disable activation menu applet on hover</_summary>
+      <_description>
+            Another way to open the menu by just hovering the mouse pointer as opposed to clicking on it.
+      </_description>
+    </key>
+
+    <key type="b" name="display-notifications">
+      <default>true</default>
+      <_summary>Whether notifications are to be displayed</_summary>
+    </key>
+
+    <key type="b" name="menu-show-places">
+      <default>true</default>
+      <_summary>Enable or disable display of places in menu applet</_summary>
+      <_description>
+            Toggles displaying the 'Places' category in the menu applet
+      </_description>
+    </key>
+
+    <key type="b" name="menu-show-recent">
+      <default>true</default>
+      <_summary>Enable or disable display of recent files in menu applet</_summary>
+      <_description>
+            Toggles displaying the 'Recent files' category in the menu applet
+      </_description>
+    </key>
+
     <key type="i" name="number-workspaces">
 	<default>2</default>
 	<_summary>Number of workspaces in Cinnamon session</_summary>
@@ -246,6 +319,22 @@
       </_description>
     </key>
     
+    <key name="expo-applet-hover" type="b">
+      <default>false</default>
+      <_summary>Expo applet: Activate on hover</_summary>
+      <_description>
+        Whether the expo applet triggers only when you click, or when you hover on it
+      </_description>
+    </key>
+    
+    <key name="scale-applet-hover" type="b">
+      <default>false</default>
+      <_summary>Scale applet: Activate on hover</_summary>
+      <_description>
+        Whether the scale applet triggers only when you click, or when you hover on it
+      </_description>
+    </key>
+    
     <key name="panel-launchers" type="as">
       <default>[ 'firefox.desktop', 'gnome-terminal.desktop', 'nautilus.desktop']</default>
       <_summary>Desktop files of the applications to put in the panel launchers applet</_summary>
@@ -273,6 +362,62 @@
         The applications corresponding to these identifiers
         will be displayed in the favorites area.
       </_description>
+    </key>
+    
+    <key name="workspace-names" type="as">
+      <default>[ 'WORKSPACE 1', 'WORKSPACE 2' ]</default>
+      <_summary>List of workspace names</_summary>
+      <_description>
+        The names of the workspaces.
+      </_description>
+    </key>
+    
+    <key type="i" name="workspace-osd-duration">
+      <default>400</default>
+      <_summary>Duration of Workspace OSD (in milliseconds)</_summary>
+      <_description>
+       Duration of the OSD (in milliseconds)    
+      </_description>
+    </key>
+    
+    <key type="i" name="workspace-osd-x">
+      <default>50</default>
+      <_summary>Workspace horizontal position (in percent of the monitor's width)</_summary>
+      <_description>
+       Workspace horizontal position (in percent of the monitor's width)   
+      </_description>
+    </key>
+    
+    <key type="i" name="workspace-osd-y">
+      <default>50</default>
+      <_summary>Workspace vertical position (in percent of the monitor's height)</_summary>
+      <_description>
+       Workspace vertical position (in percent of the monitor's height)
+      </_description>
+    </key>
+    
+    <key name="workspace-osd-visible" type="b">
+      <default>true</default>
+      <_summary>Enable or disable the workspace OSD</_summary>
+      <_description>
+        Whether the name of the workspace shows up on the screen when activated or not.
+      </_description>
+    </key>
+
+    <key name="enable-looking-glass-logs" type="b">
+      <default>false</default>
+      <_summary>Enable or disable sending Looking Glass global.log output to file</_summary>
+      <_description>
+        Whether looking glass log data is written to the file: ~/.cinnamon/glass.log or not
+      </_description>
+    </key>
+
+    <key name="workspace-expo-view-as-grid" type="b">
+      <default>false</default>
+      <summary>Display the Expo view as a grid</summary>
+      <description>
+        When enabled the Expo view will be displayed as a grid.
+      </description>
     </key>
 
     <key name="disabled-open-search-providers" type="as">
@@ -311,10 +456,21 @@
       <_summary>Whether panel launchers are draggable</_summary>
     </key>
 
+    <key type="b" name="enable-alttab-outline">
+      <default>false</default>
+      <_summary>Enable ALT+Tab outline and window preview</_summary>
+    </key>
+
+    <key type="b" name="enable-edge-flip">
+      <default>false</default>
+      <_summary>Whether edge flip is enabled</_summary>
+    </key>
+
     <child name="calendar" schema="org.cinnamon.calendar"/>
     <child name="theme" schema="org.cinnamon.theme"/>   
     <child name="recorder" schema="org.cinnamon.recorder"/>
     <child name="keyboard" schema="org.cinnamon.keyboard"/>
+    <child name="power" schema="org.cinnamon.power" />
   </schema>
  
   <schema id="org.cinnamon.theme" path="/org/cinnamon/theme/"
@@ -336,6 +492,14 @@
       <_description>
         The type of keyboard to use.
       </_description>
+    </key>
+  </schema>
+  
+  <schema id="org.cinnamon.power" path="/org/cinnamon/power/" gettext-domain="@GETTEXT_PACKAGE">
+      <key name="power-label" type="s">
+          <default>'percent'</default>
+          <_summary>Display percentage in power applet</_summary>
+          <_description>Display battery remaining as percentage or time in power applet.</_description>
     </key>
   </schema>
 
@@ -405,4 +569,41 @@
       </_description>
     </key>
   </schema>
+
+  <schema id="org.cinnamon.overrides" path="/org/cinnamon/overrides/">
+    <key name="attach-modal-dialogs" type="b">
+      <default>false</default>
+      <summary>Attach modal dialog to the parent window</summary>
+      <description>
+        This key overrides the key in org.gnome.muffin when running
+        Cinnamon.
+      </description>
+    </key>
+
+    <key name="button-layout" type="s">
+      <default>":minimize,maximize,close"</default>
+      <summary>Arrangement of buttons on the titlebar</summary>
+      <description>
+        This key overrides the key in org.gnome.desktop.wm.preferences when
+        running Cinnamon.
+      </description>
+    </key>
+
+    <key name="edge-tiling" type="b">
+      <default>true</default>
+      <summary>Enable edge tiling when dropping windows on screen edges</summary>
+      <description>
+        This key overrides the key in org.gnome.muffin when running Cinnamon.
+      </description>
+    </key>
+
+    <key name="workspaces-only-on-primary" type="b">
+      <default>false</default>
+      <summary>Workspaces only on primary monitor</summary>
+      <description>
+        This key overrides the key in org.gnome.muffin when running Cinnamon.
+      </description>
+    </key>
+  </schema>
+  
 </schemalist>

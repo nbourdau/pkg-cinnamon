@@ -14,6 +14,21 @@ const appletObj = {};
 // Maps uuid -> importer object (applet directory tree)
 const applets = {};
 
+// An applet can assume a role
+// Instead of hardcoding looking for a particular applet,
+// We let applets announce that they can fill a particular
+// role, using the 'hook' metadata entry.
+// For now, just notifications, but could be expanded.
+// question - should multiple applets be able to fill
+// the same role?
+const Roles = {
+    NOTIFICATIONS: 'notifications'
+}
+
+let AppletHooks = {
+    notifications: false
+}
+
 var enabledApplets;
 var appletsCurrentlyInPanel = [];
 var userAppletsDir = null;
@@ -75,7 +90,10 @@ function onEnabledAppletsChanged() {
                                 applet._panelLocation.remove_actor(applet.actor);
                                 applet._panelLocation = null;
                             }
-                        }        
+                            if (applet._hook)
+                                AppletHooks[applet._hook] = false;
+                        }
+                        appletsCurrentlyInPanel.splice(appletsCurrentlyInPanel.indexOf(uuid), 1);
                     }
                 }                                                         
             }            
@@ -109,6 +127,7 @@ function add_applet_to_panels(appletDefinition) {
         // format used in gsettings is 'panel:location:order:uuid' where panel is something like 'panel1', location is
         // either 'left', 'center' or 'right' and order is an integer representing the order of the applet within the panel/location (i.e. 1st, 2nd etc..).                     
         let elements = appletDefinition.split(":");
+        let center = false;
         if (elements.length == 4) {
             let panel = Main.panel;
             if (elements[0] == "panel2") {
@@ -117,6 +136,7 @@ function add_applet_to_panels(appletDefinition) {
             let location = panel._leftBox;
             if (elements[1] == "center") {
                 location = panel._centerBox;
+                center = true;
             }
             else if (elements[1] == "right") {
                 location = panel._rightBox;
@@ -159,11 +179,20 @@ function add_applet_to_panels(appletDefinition) {
                 for (let i=0; i<appletsToMove.length; i++) {
                     location.remove_actor(appletsToMove[i]);                    
                 }
-                location.add(applet.actor);  
+
+                if (center) {
+                    location.add(applet.actor, {x_align: St.Align.CENTER_SPECIAL});
+                } else {
+                    location.add(applet.actor);    
+                }
+
                 applet._panelLocation = location;                  
                 for (let i=0; i<appletsToMove.length; i++) {
                     location.add(appletsToMove[i]);
-                }  
+                }
+                appletsCurrentlyInPanel.push(uuid);
+                if (applet._hook)
+                    AppletHooks[applet._hook] = true; 
                 applet.on_applet_added_to_panel();
             } 
             else {
@@ -223,6 +252,17 @@ function _find_applet_in(uuid, dir) {
     return(directory);
 }
 
+function get_applet_enabled(uuid) {
+    return appletsCurrentlyInPanel.indexOf(uuid) != -1;
+}
+
+function get_role_provider_exists(role) {
+    if (role in AppletHooks && AppletHooks[role] == true) {
+        return true;
+    }
+    return false;
+}
+
 function loadApplet(uuid, dir, orientation) {    
     let info;    
     let applet = null;
@@ -253,6 +293,14 @@ function loadApplet(uuid, dir, orientation) {
         let prop = requiredProperties[i];
         if (!meta[prop]) {
             global.logError(uuid + ' missing "' + prop + '" property in metadata.json');
+            return null;
+        }
+    }
+
+    let hook = meta['role'];
+    if (hook) {
+        if (!(hook in AppletHooks)) {
+            global.logError('Unknown hook definition: ' + hook + ' in metadata.json of applet ' + uuid);
             return null;
         }
     }
@@ -316,6 +364,10 @@ function loadApplet(uuid, dir, orientation) {
         return null;
     }        
     
+    if (hook) {
+         applet._hook = hook;
+    }
+
     appletObj[uuid] = applet;  
     applet._uuid = uuid;
     

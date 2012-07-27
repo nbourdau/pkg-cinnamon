@@ -4,7 +4,6 @@ const Clutter = imports.gi.Clutter;
 const DBus = imports.dbus;
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
-const GConf = imports.gi.GConf;
 const Mainloop = imports.mainloop;
 const Meta = imports.gi.Meta;
 const Cinnamon = imports.gi.Cinnamon;
@@ -44,6 +43,8 @@ const LAYOUT_TRADITIONAL = "traditional";
 const LAYOUT_FLIPPED = "flipped";
 const LAYOUT_CLASSIC = "classic";
 
+const CIN_LOG_FOLDER = GLib.get_home_dir() + '/.cinnamon/';
+
 let automountManager = null;
 let autorunManager = null;
 let applets = [];
@@ -76,38 +77,29 @@ let _errorLogStack = [];
 let _startDate;
 let _defaultCssStylesheet = null;
 let _cssStylesheet = null;
-let _gdmCssStylesheet = null;
 let dynamicWorkspaces = null;
 let nWorks = null;
+
+let workspace_names = [];
 
 let background = null;
 
 let desktop_layout;
 let applet_side = St.Side.BOTTOM;
 
+let software_rendering = false;
+
+
+let lg_log_file;
+let can_log = false;
+
+
+
 // Override Gettext localization
 const Gettext = imports.gettext;
 Gettext.bindtextdomain('cinnamon', '/usr/share/cinnamon/locale');
 Gettext.textdomain('cinnamon');
 const _ = Gettext.gettext;
-
-function _createUserSession() {  
-    placesManager = new PlacesManager.PlacesManager();    
-    automountManager = new AutomountManager.AutomountManager();
-    autorunManager = new AutorunManager.AutorunManager();
-    networkAgent = new NetworkAgent.NetworkAgent();
-}
-
-function _createGDMSession() {
-    // We do this this here instead of at the top to prevent GDM
-    // related code from getting loaded in normal user sessions
-    const LoginDialog = imports.gdm.loginDialog;
-
-    let loginDialog = new LoginDialog.LoginDialog();
-    loginDialog.connect('loaded', function() {
-                            loginDialog.open();
-                        });
-}
 
 function _initRecorder() {
     let recorderSettings = new Gio.Settings({ schema: 'org.cinnamon.recorder' });
@@ -145,15 +137,11 @@ function _initUserSession() {
     ExtensionSystem.init();
     ExtensionSystem.loadExtensions();
 
-    let cinnamonwm = global.window_manager;
-
-    cinnamonwm.takeover_keybinding('panel_run_dialog');
-    cinnamonwm.connect('keybinding::panel_run_dialog', function () {
+    Meta.keybindings_set_custom_handler('panel-run-dialog', function() {
        getRunDialog().open();
     });
 
-    cinnamonwm.takeover_keybinding('panel_main_menu');
-    cinnamonwm.connect('keybinding::panel_main_menu', function () {
+    Meta.keybindings_set_custom_handler('panel-main-menu', function () {
         expo.toggle();
     });
     
@@ -165,6 +153,33 @@ function start() {
     // if we want to call back up into JS.
     global.logError = _logError;
     global.log = _logDebug;
+
+    if (global.settings.get_boolean("enable-looking-glass-logs")) {
+        try {
+            let log_filename = Gio.file_parse_name(CIN_LOG_FOLDER + '/glass.log');
+            let log_backup_filename = Gio.file_parse_name(CIN_LOG_FOLDER + '/glass.log.last');
+            let log_dir = Gio.file_new_for_path(CIN_LOG_FOLDER);
+            if (!log_filename.query_exists(null)) {
+                if (!log_dir.query_exists(null))
+                    log_dir.make_directory_with_parents(null);
+                lg_log_file = log_filename.append_to(0, null);
+            } else {
+                log_filename.copy(log_backup_filename, 1, null, null, null);
+                log_filename.delete(null);
+                lg_log_file = log_filename.append_to(0, null);
+            }
+            can_log = true;
+        } catch (e) {
+            global.logError(e);
+        }
+    }
+
+    log("About to start Cinnamon");
+    if (GLib.getenv('CINNAMON_SOFTWARE_RENDERING')) {
+        log("ACTIVATING SOFTWARE RENDERING");        
+        global.logError("Cinnamon Software Rendering mode enabled");
+        software_rendering = true;
+    }
 
     // Chain up async errors reported from C
     global.connect('notify-error', function (global, msg, detail) { notifyError(msg, detail); });
@@ -204,7 +219,6 @@ function start() {
     }
     
     _defaultCssStylesheet = global.datadir + '/theme/cinnamon.css';
-    _gdmCssStylesheet = global.datadir + '/theme/gdm.css';
     loadTheme();
     
     themeManager = new ThemeManager.ThemeManager();
@@ -226,24 +240,31 @@ function start() {
     layoutManager = new Layout.LayoutManager();
     xdndHandler = new XdndHandler.XdndHandler();
     // This overview object is just a stub for non-user sessions
-    overview = new Overview.Overview({ isDummy: global.session_type != Cinnamon.SessionType.USER });
-    expo = new Expo.Expo({ isDummy: global.session_type != Cinnamon.SessionType.USER });
+    overview = new Overview.Overview({ isDummy: false });
+    expo = new Expo.Expo({ isDummy: false });
     magnifier = new Magnifier.Magnifier();
     statusIconDispatcher = new StatusIconDispatcher.StatusIconDispatcher();  
                     
     if (desktop_layout == LAYOUT_TRADITIONAL) {                                    
         panel = new Panel.Panel(true);           
-        layoutManager.panelBox.add(panel.actor);    
+        panel.actor.add_style_class_name('panel-bottom');
+        layoutManager.panelBox.add(panel.actor);
+        layoutManager._updateBoxes();
     }
     else if (desktop_layout == LAYOUT_FLIPPED) {
         panel = new Panel.Panel(false);                 
+        panel.actor.add_style_class_name('panel-top');
         layoutManager.panelBox.add(panel.actor);  
+        layoutManager._updateBoxes();
     }
     else if (desktop_layout == LAYOUT_CLASSIC) {
         panel = new Panel.Panel(false);         
         panel2 = new Panel.Panel(true);         
+        panel.actor.add_style_class_name('panel-top');
+        panel2.actor.add_style_class_name('panel-bottom');
         layoutManager.panelBox.add(panel.actor);   
         layoutManager.panelBox2.add(panel2.actor);   
+        layoutManager._updateBoxes();
     }
                 
     wm = new WindowManager.WindowManager();
@@ -252,10 +273,10 @@ function start() {
     notificationDaemon = new NotificationDaemon.NotificationDaemon();
     windowAttentionHandler = new WindowAttentionHandler.WindowAttentionHandler();
 
-    if (global.session_type == Cinnamon.SessionType.USER)
-        _createUserSession();
-    else if (global.session_type == Cinnamon.SessionType.GDM)
-        _createGDMSession();
+    placesManager = new PlacesManager.PlacesManager();    
+    automountManager = new AutomountManager.AutomountManager();
+    //autorunManager = new AutorunManager.AutorunManager();
+    networkAgent = new NetworkAgent.NetworkAgent();
 
     Meta.later_add(Meta.LaterType.BEFORE_REDRAW, _checkWorkspaces);
 
@@ -271,8 +292,7 @@ function start() {
     overview.init();
     expo.init();
 
-    if (global.session_type == Cinnamon.SessionType.USER)
-        _initUserSession();
+    _initUserSession();
     statusIconDispatcher.start(panel.actor);
 
     // Provide the bus object for gnome-session to
@@ -295,6 +315,8 @@ function start() {
         let module = eval('imports.perf.' + perfModuleName + ';');
         Scripting.runPerfScript(module, perfOutput);
     }
+    
+    workspace_names = global.settings.get_strv("workspace-names");  
 
     global.screen.connect('notify::n-workspaces', _nWorkspacesChanged);
 
@@ -319,11 +341,32 @@ let _checkWorkspacesId = 0;
  */
 const LAST_WINDOW_GRACE_TIME = 1000;
 
+function setWorkspaceName(index, name) {
+    if (index < workspace_names.length) {
+        name.trim();
+        if (name != workspace_names[index]) {
+            workspace_names[index] = name;
+            global.settings.set_strv("workspace-names", workspace_names);
+        }
+    }
+}
+
+function getWorkspaceName(index) {
+    let wsName = index < workspace_names.length ?
+        workspace_names[index] :
+        "";
+    wsName.trim();
+    return wsName.length > 0 ?
+        wsName :
+        _("WORKSPACE") + " " + (index + 1).toString();
+}
+
 function _addWorkspace() {
     if (dynamicWorkspaces)
         return false;
     nWorks++;
-    global.settings.set_int("number-workspaces", nWorks);
+    global.settings.set_int("number-workspaces", nWorks);    
+    workspace_names.push("");    
     _staticWorkspaces();
     return true;
 }
@@ -332,6 +375,8 @@ function _removeWorkspace(workspace) {
     if (nWorks == 1 || dynamicWorkspaces)
         return false;
     nWorks--;
+    let index = workspace.index();    
+    workspace_names.splice (index,1);    
     global.settings.set_int("number-workspaces", nWorks);
     global.screen.remove_workspace(workspace, global.get_current_time());
     return true;
@@ -574,7 +619,6 @@ function notifyError(msg, details) {
         log('error: ' + msg + ': ' + details);
     else
         log('error: ' + msg);
-
     notify(msg, details);
 }
 
@@ -599,9 +643,11 @@ function _log(category, msg) {
                 text += ' ';
         }
     }
-    _errorLogStack.push({timestamp: new Date().getTime(),
+    let out = {timestamp: new Date().getTime(),
                          category: category,
-                         message: text });
+                         message: text };
+    _errorLogStack.push(out);
+    if (can_log) lg_log_file.write(renderLogLine(out), null);
 }
 
 function _logError(msg) {
@@ -617,6 +663,21 @@ function _getAndClearErrorStack() {
     let errors = _errorLogStack;
     _errorLogStack = [];
     return errors;
+}
+
+
+function formatTime(d) {
+    function pad(n) { return n < 10 ? '0' + n : n; }
+    return d.getUTCFullYear()+'-'
+        + pad(d.getUTCMonth()+1)+'-'
+        + pad(d.getUTCDate())+'T'
+        + pad(d.getUTCHours())+':'
+        + pad(d.getUTCMinutes())+':'
+        + pad(d.getUTCSeconds())+'Z';
+}
+
+function renderLogLine(line) {
+    return line.category + ' t=' + formatTime(new Date(line.timestamp)) + ' ' + line.message + '\n';
 }
 
 function logStackTrace(msg) {
@@ -660,23 +721,12 @@ function _globalKeyPressHandler(actor, event) {
     // This relies on the fact that Clutter.ModifierType is the same as Gdk.ModifierType
     let action = global.display.get_keybinding_action(keyCode, modifierState);
 
-    // The screenshot action should always be available (even if a
-    // modal dialog is present)
-    if (action == Meta.KeyBindingAction.COMMAND_SCREENSHOT) {
-        let gconf = GConf.Client.get_default();
-        let command = gconf.get_string('/apps/metacity/keybinding_commands/command_screenshot');
-        if (command != null && command != '')
-            Util.spawnCommandLine(command);
-        return true;
-    }
-
-    // Other bindings are only available to the user session when the overview is up and
-    // no modal dialog is present.
-    if (global.session_type == Cinnamon.SessionType.USER && ((!overview.visible && !expo.visible) || modalCount > 1))
+    // Other bindings are only available when the overview is up and no modal dialog is present
+    if (((!overview.visible && !expo.visible) || modalCount > 1))
         return false;
 
     // This isn't a Meta.KeyBindingAction yet
-    if (symbol == Clutter.Super_L || symbol == Clutter.Super_R || symbol == Clutter.Return) {
+    if (symbol == Clutter.Super_L || symbol == Clutter.Super_R) {
         overview.hide();
         expo.hide();
         return true;
@@ -686,10 +736,6 @@ function _globalKeyPressHandler(actor, event) {
         //Used to call the ctrlalttabmanager in Gnome Shell
         return true;
     }
-
-    // None of the other bindings are relevant outside of the user's session
-    if (global.session_type != Cinnamon.SessionType.USER)
-        return false;
 
     switch (action) {
         // left/right would effectively act as synonyms for up/down if we enabled them;
@@ -998,3 +1044,49 @@ function queueDeferredWork(workId) {
         });
     }
 }
+
+/**
+ * getTabList:
+ * @workspaceOpt (optional) workspace, defaults to global.screen.get_active_workspace()
+ * @screenOpt: (optional) screen, defaults to global.screen
+ *
+ * Return a list of the interesting windows on a workspace (by default,
+ * the active workspace).
+ * The list will include app-less dialogs.
+ */
+function getTabList(workspaceOpt, screenOpt) {
+    let screen = screenOpt || global.screen;
+    let display = screen.get_display();
+    let workspace = workspaceOpt || screen.get_active_workspace();
+    
+    let windows = []; // the array to return
+
+    // Run a pass through the NORMAL tablist. We only record the identity 
+    // of each window at this point.
+    let normalLookup = {};
+    let normalWindows = display.get_tab_list(Meta.TabList.NORMAL, screen,
+                                       workspace);
+    for (let i = 0; i < normalWindows.length; ++i) {
+        let window = normalWindows[i];
+        normalLookup[window.get_stable_sequence()] = 1;
+    }
+
+    // Run a pass through the NORMAL_ALL tablist.
+    // The purpose is to find "orphan" windows that would otherwise be
+    // difficult to navigate to when lost behind other windows.
+    // The purpose of adding all windows in the same loop is to preserve
+    // the correct tab order.
+    let allwindows = display.get_tab_list(Meta.TabList.NORMAL_ALL, screen,
+                                       workspace);
+    let tracker = Cinnamon.WindowTracker.get_default();
+    for (let i = 0; i < allwindows.length; ++i) {
+        let window = allwindows[i];
+        // Add "normal" windows and those that don't have an "app".
+        if (normalLookup[window.get_stable_sequence()] === 1 || !tracker.get_window_app(window))
+        {
+            windows.push(window);
+        }
+    }
+    return windows;
+}
+

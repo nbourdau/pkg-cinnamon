@@ -15,13 +15,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/**
- * SECTION:st-types
- * @short_description: type definitions used throughout St
- *
- * Common types for StWidgets.
- */
-
 
 #if !defined(ST_H_INSIDE) && !defined(ST_COMPILATION)
 #error "Only <st/st.h> can be included directly.h"
@@ -36,17 +29,26 @@
 
 G_BEGIN_DECLS
 
+/**
+ * SECTION:st-types
+ * @short_description: type definitions used throughout St
+ *
+ * Common types for StWidgets.
+ */
+
 typedef enum {
   ST_ALIGN_START,
   ST_ALIGN_MIDDLE,
-  ST_ALIGN_END
+  ST_ALIGN_END,
+  ST_ALIGN_CENTER_SPECIAL
 } StAlign;
 
 typedef enum {
   ST_ICON_SYMBOLIC,
   ST_ICON_FULLCOLOR,
   ST_ICON_APPLICATION,
-  ST_ICON_DOCUMENT
+  ST_ICON_DOCUMENT,
+  ST_ICON_FADED
 } StIconType;
 
 G_END_DECLS

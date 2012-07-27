@@ -12,7 +12,6 @@ const Main = imports.ui.main;
 const Overview = imports.ui.overview;
 const Tweener = imports.ui.tweener;
 const Workspace = imports.ui.workspace;
-const WorkspaceThumbnail = imports.ui.workspaceThumbnail;
 
 const WORKSPACE_SWITCH_TIME = 0.25;
 // Note that muffin has a compile-time limit of 36
@@ -122,6 +121,49 @@ WorkspacesView.prototype = {
                                                       Lang.bind(this, this._dragEnd));
         this._swipeScrollBeginId = 0;
         this._swipeScrollEndId = 0;
+
+        this._stageKeyPressId = global.stage.connect('key-press-event',
+            Lang.bind(this, this._onStageKeyPress));
+        Main.overview.connect('hiding', Lang.bind(this,
+            function () {
+                if (this._stageKeyPressId != 0) {
+                    global.stage.disconnect(this._stageKeyPressId);
+                    this._stageKeyPressId = 0;
+                }
+            }));
+            
+        // this should select the last active window
+        if (this._workspaces.length > 0) { 
+            this._workspaces[activeWorkspaceIndex].selectAnotherWindow(Clutter.Right);
+        }
+    },
+
+    _onStageKeyPress: function(actor, event) {
+        let activeWorkspaceIndex = global.screen.get_active_workspace_index();
+        let activeWorkspace = this._workspaces[activeWorkspaceIndex];
+
+        let modifiers = Cinnamon.get_event_state(event);
+        let symbol = event.get_key_symbol();
+
+        if (symbol === Clutter.w && modifiers & Clutter.ModifierType.CONTROL_MASK) {
+            activeWorkspace.closeSelectedWindow();
+            return true;
+        }
+
+        if (symbol === Clutter.Left || symbol === Clutter.Up 
+                || symbol === Clutter.Right || symbol === Clutter.Down) {
+            activeWorkspace.selectAnotherWindow(symbol);
+            return true;
+        }
+        
+        if (symbol === Clutter.Return || symbol === Clutter.KEY_space) {
+            if (activeWorkspace.activateSelectedWindow()) {
+                return true;
+            }
+            Main.overview.hide();
+            return true;
+        }
+        return false;
     },
 
     setGeometry: function(x, y, width, height, spacing) {
@@ -196,6 +238,7 @@ WorkspacesView.prototype = {
         let active = global.screen.get_active_workspace_index();
 
         this._updateWorkspaceActors(showAnimation);
+        Main.wm.showWorkspaceOSD();
         this._updateScrollAdjustment(active, showAnimation);
     },
 
@@ -482,10 +525,7 @@ WorkspacesDisplay.prototype = {
                          Lang.bind(this, this._onScrollEvent));
 
         this._monitorIndex = Main.layoutManager.primaryIndex;
-
-        this._thumbnailsBox = new WorkspaceThumbnail.ThumbnailsBox();
-        controls.add_actor(this._thumbnailsBox.actor);
-
+        
         this.workspacesView = null;
 
         this._inDrag = false;
@@ -525,7 +565,7 @@ WorkspacesDisplay.prototype = {
         this._updateZoom();
 
         this._controls.show();
-        this._thumbnailsBox.show();
+        // this._thumbnailsBox.show();
 
         this._workspaces = [];
         for (let i = 0; i < global.screen.n_workspaces; i++) {
@@ -569,7 +609,7 @@ WorkspacesDisplay.prototype = {
 
     hide: function() {
         this._controls.hide();
-        this._thumbnailsBox.hide();
+        // this._thumbnailsBox.hide();
 
         if (this._restackedNotifyId > 0){
             global.screen.disconnect(this._restackedNotifyId);
@@ -708,16 +748,16 @@ WorkspacesDisplay.prototype = {
     },
 
     _onRestacked: function() {
-        let stack = global.get_window_actors();
+        let stack = Main.getTabList();
         let stackIndices = {};
 
         for (let i = 0; i < stack.length; i++) {
             // Use the stable sequence for an integer to use as a hash key
-            stackIndices[stack[i].get_meta_window().get_stable_sequence()] = i;
+            stackIndices[stack[i].get_stable_sequence()] = stack.length - i;
         }
 
         this.workspacesView.syncStacking(stackIndices);
-        this._thumbnailsBox.syncStacking(stackIndices);
+        // this._thumbnailsBox.syncStacking(stackIndices);
     },
 
     _workspacesChanged: function() {
@@ -742,7 +782,7 @@ WorkspacesDisplay.prototype = {
                 this._workspaces[w] = new Workspace.Workspace(metaWorkspace, this._monitorIndex);
             }
 
-            this._thumbnailsBox.addThumbnails(oldNumWorkspaces, newNumWorkspaces - oldNumWorkspaces);
+            // this._thumbnailsBox.addThumbnails(oldNumWorkspaces, newNumWorkspaces - oldNumWorkspaces);
         } else {
             // Assume workspaces are only removed sequentially
             // (e.g. 2,3,4 - not 2,4,7)
@@ -764,7 +804,7 @@ WorkspacesDisplay.prototype = {
                 lostWorkspaces[l].destroy();
             }
 
-            this._thumbnailsBox.removeThumbmails(removedIndex, removedNum);
+            // this._thumbnailsBox.removeThumbmails(removedIndex, removedNum);
         }
 
         this.workspacesView.updateWorkspaces(oldNumWorkspaces,
