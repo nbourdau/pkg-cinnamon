@@ -133,41 +133,10 @@ AltTabPopup.prototype = {
         }
     },
 
-    _getAppLists: function() {
-        let tracker = Cinnamon.WindowTracker.get_default();
-        let appSys = Cinnamon.AppSystem.get_default();
-        let allApps = appSys.get_running ();
-
-        let screen = global.screen;
-        let display = screen.get_display();
-        let windows = display.get_tab_list(Meta.TabList.NORMAL, screen,
-                                           screen.get_active_workspace());
-
-        // windows is only the windows on the current workspace. For
-        // each one, if it corresponds to an app we know, move that
-        // app from allApps to apps.
-        let apps = [];
-        for (let i = 0; i < windows.length && allApps.length != 0; i++) {
-            let app = tracker.get_window_app(windows[i]);
-            let index = allApps.indexOf(app);
-            if (index != -1) {
-                apps.push(app);
-                allApps.splice(index, 1);
-            }
-        }
-
-        // Now @apps is a list of apps on the current workspace, in
-        // standard Alt+Tab order (MRU except for minimized windows),
-        // and allApps is a list of apps that only appear on other
-        // workspaces, sorted by user_time, which is good enough.
-        return [apps, allApps];
-    },
-
     show : function(backward, binding, mask) {
         let screen = global.screen;
         let display = screen.get_display();
-        let windows = display.get_tab_list(Meta.TabList.NORMAL, screen,
-                                           screen.get_active_workspace());
+        let windows = Main.getTabList();
 
         if (windows.length == 0)
             return false;
@@ -197,7 +166,7 @@ AltTabPopup.prototype = {
         this.actor.get_allocation_box();
 
         // Make the initial selection
-        if (binding == 'switch_group') {
+        if (binding == 'switch-group') {
             if (backward) {
                 this._select(0, this._appIcons[0].cachedWindows.length - 1);
             } else {
@@ -206,9 +175,9 @@ AltTabPopup.prototype = {
                 else
                     this._select(0, 0);
             }
-        } else if (binding == 'switch_group_backward') {
+        } else if (binding == 'switch-group-backward') {
             this._select(0, this._appIcons[0].cachedWindows.length - 1);
-        } else if (binding == 'switch_windows_backward') {
+        } else if (binding == 'switch-windows-backward') {
             this._select(this._appIcons.length - 1);
         } else if (this._appIcons.length == 1) {
             this._select(0);
@@ -355,8 +324,16 @@ AltTabPopup.prototype = {
             else
                 window = null;
             this._appIcons[this._currentApp].app.activate_window(window, global.get_current_time());
-        } else {
+        }
+        else if (this._appIcons[n].app) {
             this._appIcons[n].app.activate_window(null, global.get_current_time());
+        }
+        else if (this._appIcons[n].cachedWindows.length > 0) {
+            // can this happen?
+            Main.activateWindow(this._appIcons[n].cachedWindows[0]);
+        }
+        else {
+            // and this?
         }
         this.destroy();
     },
@@ -399,8 +376,15 @@ AltTabPopup.prototype = {
         let app = this._appIcons[this._currentApp];
         if (this._currentWindow >= 0) {
             Main.activateWindow(app.cachedWindows[this._currentWindow]);
-        } else {
+        }
+        else if (app.app) {
             app.app.activate_window(null, global.get_current_time());
+        }
+        else if (app.cachedWindows.length > 0) {
+            Main.activateWindow(app.cachedWindows[0]);
+        }
+        else {
+            // what to do???
         }
         this.destroy();
     },
@@ -413,26 +397,26 @@ AltTabPopup.prototype = {
     },
 
     destroy : function() {
+        var doDestroy = Lang.bind(this, function() {
+           Main.uiGroup.remove_actor(this.actor);
+           this.actor.destroy();
+        });
+        
         this._popModal();
         if (this.actor.visible) {
             Tweener.addTween(this.actor,
                              { opacity: 0,
                                time: POPUP_FADE_OUT_TIME,
                                transition: 'easeOutQuad',
-                               onComplete: Lang.bind(this,
-                                   function() {
-                                       this.actor.destroy();
-                                   })
+                               onComplete: doDestroy
                              });
-        } else
-            this.actor.destroy();
+        } else {
+            doDestroy();
+        }
     },
 
     _onDestroy : function() {
         this._popModal();
-
-        if (this._thumbnails)
-            this._destroyThumbnails();
 
         if (this._motionTimeoutId != 0)
             Mainloop.source_remove(this._motionTimeoutId);
@@ -441,7 +425,81 @@ AltTabPopup.prototype = {
         if (this._initialDelayTimeoutId != 0)
             Mainloop.source_remove(this._initialDelayTimeoutId);
     },
+    
+    _outlineContours: function() {
+        if (this._outlineBackground) {
+            this.actor.remove_actor(this._outlineBackground);
+            this._outlineBackground.destroy();
+            this._outlineBackground = null;
+            this.actor.remove_actor(this._outlineFrame);
+            this._outlineFrame.destroy();
+        }
+        if (!this._outlineSettingsFetched) {
+            this._outlineEnabled = global.settings.get_boolean("enable-alttab-outline");
+            this._outlineSettingsFetched = true;
+        }
+        if (!this._outlineEnabled || !this._appIcons[this._currentApp].cachedWindows.length) {
+            return;
+        }
 
+        let showOutline = function() {
+            let window = this._appIcons[this._currentApp].cachedWindows[0];
+
+            // Create the actor that will serve as background for the clone.
+            let background = new St.Bin({style_class: 'switcher-outline-background switcher-outline-frame'});
+            this._outlineBackground = background;
+            this.actor.add_actor(background);
+            // Make sure that the frame does not overlap the switcher.
+            background.lower(this._appSwitcher.actor);
+                    
+            // We need to know the border width so that we can 
+            // make the background slightly bigger than the clone window.
+            let themeNode = background.get_theme_node();
+            let borderWidth = themeNode.get_border_width(St.Side.LEFT);// assume same for all sides
+            let borderAdj = borderWidth / 2;
+
+            let or = window.get_outer_rect();
+            or.x -= borderAdj; or.y -= borderAdj; 
+            or.width += borderAdj; or.height += borderAdj; 
+
+            let childBox = new Clutter.ActorBox();
+            childBox.x1 = or.x;
+            childBox.x2 = or.x + or.width;
+            childBox.y1 = or.y;
+            childBox.y2 = or.y + or.height;
+            background.allocate(childBox, 0);
+
+            // The frame is needed to draw the border round the clone.
+            let frame = this._outlineFrame = new St.Bin({style_class: 'switcher-outline-frame'});
+            this.actor.add_actor(frame); // must not be a child of the background
+            frame.allocate(childBox, 0); // same dimensions
+            frame.lower(this._appSwitcher.actor);
+            background.lower(frame);
+
+            // Show a clone of the target window
+            let outlineClone = new Clutter.Clone({source: window.get_compositor_private().get_texture()});
+            background.add_actor(outlineClone);
+            outlineClone.opacity = 225; // slightly translucent to get a tint from the background color
+
+            // The clone's rect is not the same as the window's outer rect
+            let ir = window.get_input_rect();
+            let diffX = (ir.width - or.width)/2;
+            let diffY = (ir.height - or.height)/2;
+
+            childBox.x1 = -diffX;
+            childBox.x2 = or.width + diffX;
+            childBox.y1 = -diffY;
+            childBox.y2 = or.height + diffY;
+            outlineClone.allocate(childBox, 0);
+        };
+
+        // Use a cancellable timeout to avoid flicker effect when tabbing rapidly through the set
+        if (this._displayOutlineTimeoutId) {
+            Mainloop.source_remove(this._displayOutlineTimeoutId);
+        }
+        this._displayOutlineTimeoutId = Mainloop.timeout_add(100, Lang.bind(this, showOutline));
+    },
+    
     /**
      * _select:
      * @app: index of the app to select
@@ -486,10 +544,11 @@ AltTabPopup.prototype = {
         this._appSwitcher.highlight(app, this._thumbnailsFocused);
 
         if (window != null) {
-            /*if (!this._thumbnails)
-                this._createThumbnails();*/
+            if (!this._thumbnails)
+                this._createThumbnails();
+            this._outlineContours();
             this._currentWindow = window;
-            //this._thumbnails.highlight(window, forceAppFocus);
+            this._thumbnails.highlight(window, forceAppFocus);
         } else if (this._appIcons[this._currentApp].cachedWindows.length > 1 &&
                    !forceAppFocus) {
             this._thumbnailTimeoutId = Mainloop.timeout_add (
@@ -508,16 +567,17 @@ AltTabPopup.prototype = {
 
     _destroyThumbnails : function() {
         let thumbnailsActor = this._thumbnails.actor;
-        Tweener.addTween(thumbnailsActor,
-                         { opacity: 0,
-                           time: THUMBNAIL_FADE_TIME,
-                           transition: 'easeOutQuad',
-                           onComplete: Lang.bind(this, function() {
-                                                            thumbnailsActor.destroy();
-                                                            this.thumbnailsVisible = false;
-                                                        })
-                         });
         this._thumbnails = null;
+        Tweener.addTween(thumbnailsActor,
+            { opacity: 0,
+                time: THUMBNAIL_FADE_TIME,
+                transition: 'easeOutQuad',
+                onComplete: Lang.bind(this, function() {
+                    this.actor.remove_actor(thumbnailsActor);
+                    thumbnailsActor.destroy();
+                    this.thumbnailsVisible = false;
+                })
+            });
     },
 
     _createThumbnails : function() {
@@ -877,13 +937,17 @@ AppIcon.prototype = {
             this.actor.add(bin);
         }
         else {
-            this.label = new St.Label({ text: this.app.get_name() });
+            this.label = new St.Label({ text: this.app ? this.app.get_name() : window.title });
             this.actor.add(this.label, { x_fill: false });
         }
     },
 
     set_size: function(size) {
-        this.icon = this.app.create_icon_texture(size);
+        this.icon = this.app ? 
+            this.app.create_icon_texture(size) :
+            new St.Icon({ icon_name: 'application-default-icon',
+                                 icon_type: St.IconType.FULLCOLOR,
+                                 icon_size: size });
         this._iconBin.set_size(size, size);
         this._iconBin.child = this.icon;
     }
@@ -1012,28 +1076,17 @@ AppSwitcher.prototype = {
     },
 
     // We override SwitcherList's highlight() method to also deal with
-    // the AppSwitcher->ThumbnailList arrows. Apps with only 1 window
-    // will hide their arrows by default, but show them when their
-    // thumbnails are visible (ie, when the app icon is supposed to be
-    // in justOutline mode). Apps with multiple windows will normally
-    // show a dim arrow, but show a bright arrow when they are
-    // highlighted.
+    // the AppSwitcher->ThumbnailList arrows.
     highlight : function(n, justOutline) {
         if (this._curApp != -1) {
-            if (this.icons[this._curApp].cachedWindows.length == 1)
-                this._arrows[this._curApp].hide();
-            else
-                this._arrows[this._curApp].remove_style_pseudo_class('highlighted');
+            this._arrows[this._curApp].hide();
         }
 
         SwitcherList.prototype.highlight.call(this, n, justOutline);
         this._curApp = n;
 
         if (this._curApp != -1) {
-            if (justOutline && this.icons[this._curApp].cachedWindows.length == 1)
-                this._arrows[this._curApp].show();
-            else
-                this._arrows[this._curApp].add_style_pseudo_class('highlighted');
+            this._arrows[this._curApp].show();
         }
     },
 
@@ -1047,8 +1100,9 @@ AppSwitcher.prototype = {
         this._list.add_actor(arrow);
         this._arrows.push(arrow);
 
-        if (appIcon.cachedWindows.length == 1)
+        if (appIcon.cachedWindows.length == 1) {
             arrow.hide();
+        }
     }
 };
 
@@ -1110,7 +1164,8 @@ ThumbnailList.prototype = {
             return;
         let totalPadding = this._items[0].get_theme_node().get_horizontal_padding() + this._items[0].get_theme_node().get_vertical_padding();
         totalPadding += this.actor.get_theme_node().get_horizontal_padding() + this.actor.get_theme_node().get_vertical_padding();
-        let [labelMinHeight, labelNaturalHeight] = this._labels[0].get_preferred_height(-1);
+        let [labelMinHeight, labelNaturalHeight] = this._labels.length > 0 ?
+            this._labels[0].get_preferred_height(-1) : [0, 0];
         let spacing = this._items[0].child.get_theme_node().get_length('spacing');
 
         availHeight = Math.min(availHeight - labelNaturalHeight - totalPadding - spacing, THUMBNAIL_DEFAULT_SIZE);

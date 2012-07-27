@@ -162,7 +162,7 @@ class ThemeViewSidePage (SidePage):
         scrolledWindow.add_with_viewport(other_settings_box)
         other_settings_box.set_border_width(5)
         
-        windowThemeSwitcher = GConfComboBox(_("Window theme"), "/desktop/cinnamon/windows/theme", self._load_window_themes(), "Adwaita")
+        windowThemeSwitcher = GSettingsComboBox(_("Window theme"), "org.gnome.desktop.wm.preferences", "theme", self._load_window_themes())
         other_settings_box.pack_start(windowThemeSwitcher, False, False, 2)
         menusHaveIconsCB = GSettingsCheckButton(_("Menus Have Icons"), "org.gnome.desktop.interface", "menus-have-icons")
         other_settings_box.pack_start(menusHaveIconsCB, False, False, 2)
@@ -235,14 +235,17 @@ class ThemeViewSidePage (SidePage):
             themes = os.listdir(directory)
             themes.sort()
             for theme in themes:
-                if os.path.exists("%s/%s/cinnamon/cinnamon.css" % (directory, theme)):
-                    if os.path.exists("%s/%s/cinnamon/thumbnail.png" % (directory, theme)):
-                        img = GdkPixbuf.Pixbuf.new_from_file_at_size( "%s/%s/cinnamon/thumbnail.png" % (directory, theme), 64, 64 )
-                    else:
-                        img = GdkPixbuf.Pixbuf.new_from_file_at_size( "/usr/share/cinnamon/theme/thumbnail-generic.png", 64, 64 )
-                    theme_iter = self.model.append([theme, img])
-                    if theme==self.current_theme:
-                        self.active_theme_iter = theme_iter
+                try:
+                    if os.path.exists("%s/%s/cinnamon/cinnamon.css" % (directory, theme)):
+                        if os.path.exists("%s/%s/cinnamon/thumbnail.png" % (directory, theme)):
+                            img = GdkPixbuf.Pixbuf.new_from_file_at_size( "%s/%s/cinnamon/thumbnail.png" % (directory, theme), 64, 64 )
+                        else:
+                            img = GdkPixbuf.Pixbuf.new_from_file_at_size( "/usr/share/cinnamon/theme/thumbnail-generic.png", 64, 64 )
+                        theme_iter = self.model.append([theme, img])
+                        if theme==self.current_theme:
+                            self.active_theme_iter = theme_iter
+                except Exception, detail:
+                    print detail
         
     def apply_theme(self, iconView):
         selected_items = iconView.get_selected_items()
@@ -562,14 +565,14 @@ class GSettingsEntry(Gtk.HBox):
         self.settings = Gio.Settings.new(schema)        
         self.content_widget.set_text(self.settings.get_string(self.key))
         self.settings.connect("changed::"+self.key, self.on_my_setting_changed)
-        self.content_widget.connect('changed', self.on_my_value_changed)     
+        self.content_widget.connect('focus-out-event', self.on_my_value_changed)     
         
         self.content_widget.show_all()       
     
     def on_my_setting_changed(self, settings, key):
         self.content_widget.set_text(self.settings.get_string(self.key))
         
-    def on_my_value_changed(self, widget):        
+    def on_my_value_changed(self, event, widget):        
         self.settings.set_string(self.key, self.content_widget.get_text())
 
 class GSettingsFileChooser(Gtk.HBox):
@@ -978,11 +981,15 @@ class ChangeTimeWidget(Gtk.HBox):
             thread.start_new_thread(self._do_change_system_time, ())
 
 class TitleBarButtonsOrderSelector(Gtk.Table):
-    def __init__(self):
-        self.key = "/desktop/cinnamon/windows/button_layout"
+    def __init__(self):        
+        self.schema = "org.cinnamon.overrides"
+        self.key = "button-layout"
+        
         super(TitleBarButtonsOrderSelector, self).__init__()
-        self.settings = gconf.client_get_default()
+        
+        self.settings = Gio.Settings.new(self.schema)        
         self.value = self.settings.get_string(self.key)
+                
         try:
             left_items, right_items = self.value.split(":")
         except:
@@ -1040,9 +1047,9 @@ class TitleBarButtonsOrderSelector(Gtk.Table):
             renderer_text = Gtk.CellRendererText()
             i.pack_start(renderer_text, True)
             i.add_attribute(renderer_text, "text", 1)
-            i.connect("changed", self.on_my_value_changed)
             if selected_iter is not None:
                 i.set_active_iter(selected_iter)
+            i.connect("changed", self.on_my_value_changed)
         
         for i in self.left_side_widgets:
             left_side_box.pack_start(i, False, False, 2)
@@ -1103,45 +1110,59 @@ class MainWindow:
         self.window.connect("destroy", Gtk.main_quit)
 
         self.sidePages = []
-                                                      
-        sidePage = SidePage(_("Panel"), "panel.svg", self.content_box)
-        self.sidePages.append((sidePage, "panel"))
+                               
+        sidePage = SidePage(_("Menu"), "menu.svg", self.content_box)
+        self.sidePages.append((sidePage, "menu"))
         sidePage.add_widget(GSettingsEntry(_("Menu text"), "org.cinnamon", "menu-text")) 
         sidePage.add_widget(GSettingsFileChooser(_("Menu icon"), "org.cinnamon", "menu-icon", True))
-        sidePage.add_widget(GSettingsSpinButton(_("Menu hover delay"), "org.cinnamon", "menu-hover-delay", 0, 2000, 50, 200, _("milliseconds")))        
-        
+        sidePage.add_widget(GSettingsSpinButton(_("Menu hover delay"), "org.cinnamon", "menu-hover-delay", 0, 2000, 50, 200, _("milliseconds")))                        
+        sidePage.add_widget(GSettingsCheckButton(_("Activate menu on hover"), "org.cinnamon", "activate-menu-applet-on-hover"))
+        sidePage.add_widget(GSettingsCheckButton(_("Show bookmarks and places"), "org.cinnamon", "menu-show-places"))
+        sidePage.add_widget(GSettingsCheckButton(_("Show recent files"), "org.cinnamon", "menu-show-recent"))
+
+        sidePage = SidePage(_("Panel"), "panel.svg", self.content_box)
+        self.sidePages.append((sidePage, "panel"))                
         sidePage.add_widget(GSettingsCheckButton(_("Auto-hide panel"), "org.cinnamon", "panel-autohide"))
+        sidePage.add_widget(GSettingsSpinButton(_("Show delay"), "org.cinnamon", "panel-show-delay", 0, 2000, 50, 200, _("milliseconds")))
+        sidePage.add_widget(GSettingsSpinButton(_("Hide delay"), "org.cinnamon", "panel-hide-delay", 0, 2000, 50, 200, _("milliseconds")))
+        
         desktop_layouts = [["traditional", _("Traditional (panel at the bottom)")], ["flipped", _("Flipped (panel at the top)")], ["classic", _("Classic (panels at the top and at the bottom)")]]        
-        desktop_layouts_combo = GSettingsComboBox(_("Desktop layout"), "org.cinnamon", "desktop-layout", desktop_layouts)
+        desktop_layouts_combo = GSettingsComboBox(_("Panel layout"), "org.cinnamon", "desktop-layout", desktop_layouts)
         sidePage.add_widget(desktop_layouts_combo) 
         label = Gtk.Label()
         label.set_markup("<i><small>%s</small></i>" % _("Note: If you change the layout you will need to restart Cinnamon."))
         sidePage.add_widget(label)
-        sidePage.add_widget(GSettingsCheckButton(_("Panel edit mode"), "org.cinnamon", "panel-edit-mode"))
-        sidePage.add_widget(GSettingsCheckButton(_("Panel Launchers draggable"), "org.cinnamon", "panel-launchers-draggable"))       
+        sidePage.add_widget(GSettingsCheckButton(_("Use customized panel size (otherwise it's defined by the theme)"), "org.cinnamon", "panel-resizable"))
+        sidePage.add_widget(GSettingsSpinButton(_("Top panel height"), "org.cinnamon", "panel-top-height", 0, 2000, 1, 5, _("Pixels")))
+        sidePage.add_widget(GSettingsSpinButton(_("Bottom panel height"), "org.cinnamon", "panel-bottom-height", 0, 2000, 1, 5, _("Pixels")))
+        sidePage.add_widget(GSettingsCheckButton(_("Panel edit mode"), "org.cinnamon", "panel-edit-mode"))        
         
         sidePage = SidePage(_("Calendar"), "clock.svg", self.content_box)
-        self.sidePages.append((sidePage, "calendar"))
-        self.changeTimeWidget = ChangeTimeWidget()     
+        self.sidePages.append((sidePage, "calendar"))        
         sidePage.add_widget(GSettingsCheckButton(_("Show week dates in calendar"), "org.cinnamon.calendar", "show-weekdate"))         
         sidePage.add_widget(GSettingsEntry(_("Date format for the panel"), "org.cinnamon.calendar", "date-format"))                                 
         sidePage.add_widget(GSettingsEntry(_("Date format inside the date applet"), "org.cinnamon.calendar", "date-format-full"))                                 
         sidePage.add_widget(Gtk.LinkButton.new_with_label("http://www.foragoodstrftime.com/", _("Generate your own date formats")))
-        self.ntpCheckButton = None 
-        try:
-            self.ntpCheckButton = DBusCheckButton(_("Use network time"), "org.gnome.SettingsDaemon.DateTimeMechanism", "/", "GetUsingNtp", "SetUsingNtp")
-            sidePage.add_widget(self.ntpCheckButton)
-        except:
-            pass
-        sidePage.add_widget(self.changeTimeWidget)
-        try:
-            sidePage.add_widget(TimeZoneSelectorWidget())
-        except:
-            pass
         
-        if self.ntpCheckButton != None:
-            self.ntpCheckButton.connect('toggled', self._ntp_toggled)
-            self.changeTimeWidget.change_using_ntp( self.ntpCheckButton.get_active() )
+        try:
+            self.changeTimeWidget = ChangeTimeWidget()  
+            self.ntpCheckButton = None 
+            try:
+                self.ntpCheckButton = DBusCheckButton(_("Use network time"), "org.gnome.SettingsDaemon.DateTimeMechanism", "/", "GetUsingNtp", "SetUsingNtp")
+                sidePage.add_widget(self.ntpCheckButton)
+            except:
+                pass
+            sidePage.add_widget(self.changeTimeWidget)
+            try:
+                sidePage.add_widget(TimeZoneSelectorWidget())
+            except:
+                pass
+            
+            if self.ntpCheckButton != None:
+                self.ntpCheckButton.connect('toggled', self._ntp_toggled)
+                self.changeTimeWidget.change_using_ntp( self.ntpCheckButton.get_active() )
+        except Exception, detail:
+            print detail
         
         sidePage = SidePage(_("Hot corner"), "overview.svg", self.content_box)
         self.sidePages.append((sidePage, "hotcorner"))
@@ -1165,12 +1186,16 @@ class MainWindow:
         box.pack_start(combo, False, False, 0)               
         sidePage.add_widget(box)
         
+        sidePage.add_widget(GSettingsCheckButton(_("Expo applet: activate on hover"), "org.cinnamon", "expo-applet-hover"))
+        sidePage.add_widget(GSettingsCheckButton(_("Scale applet: activate on hover"), "org.cinnamon", "scale-applet-hover"))
+
         sidePage = ThemeViewSidePage(_("Themes"), "themes.svg", self.content_box)
         self.sidePages.append((sidePage, "themes"))
         
         sidePage = SidePage(_("Effects"), "desktop-effects.svg", self.content_box)
         self.sidePages.append((sidePage, "effects"))
         sidePage.add_widget(GSettingsCheckButton(_("Enable desktop effects"), "org.cinnamon", "desktop-effects"))
+        sidePage.add_widget(GSettingsCheckButton(_("Enable desktop effects on dialog boxes"), "org.cinnamon", "desktop-effects-on-dialogs"))
         
         # Destroy window effects
         transition_effects = []
@@ -1280,35 +1305,53 @@ class MainWindow:
         
         sidePage = ExtensionViewSidePage(_("Extensions"), "extensions.svg", self.content_box)
         self.sidePages.append((sidePage, "extensions"))
+        
+        nautilus_desktop_schema = Gio.Settings.new("org.gnome.nautilus.desktop")
+        nautilus_desktop_keys = nautilus_desktop_schema.list_keys()
                         
         sidePage = SidePage(_("Desktop"), "desktop.svg", self.content_box)
         self.sidePages.append((sidePage, "desktop"))
         sidePage.add_widget(GSettingsCheckButton(_("Have file manager handle the desktop"), "org.gnome.desktop.background", "show-desktop-icons"))
-        sidePage.add_widget(GSettingsCheckButton(_("Computer icon visible on desktop"), "org.gnome.nautilus.desktop", "computer-icon-visible"))
-        sidePage.add_widget(GSettingsCheckButton(_("Home icon visible on desktop"), "org.gnome.nautilus.desktop", "home-icon-visible"))
-        sidePage.add_widget(GSettingsCheckButton(_("Network Servers icon visible on desktop"), "org.gnome.nautilus.desktop", "network-icon-visible"))
-        sidePage.add_widget(GSettingsCheckButton(_("Trash icon visible on desktop"), "org.gnome.nautilus.desktop", "trash-icon-visible"))
-        sidePage.add_widget(GSettingsCheckButton(_("Show mounted volumes on the desktop"), "org.gnome.nautilus.desktop", "volumes-visible"))
-        sidePage.add_widget(GConfCheckButton(_("Only use workspaces on primary monitor (requires Cinnamon restart)"), "/desktop/cinnamon/windows/workspaces_only_on_primary"))
+        if "computer-icon-visible" in nautilus_desktop_keys:
+            sidePage.add_widget(GSettingsCheckButton(_("Computer icon visible on desktop"), "org.gnome.nautilus.desktop", "computer-icon-visible"))
+        if "home-icon-visible" in nautilus_desktop_keys:
+            sidePage.add_widget(GSettingsCheckButton(_("Home icon visible on desktop"), "org.gnome.nautilus.desktop", "home-icon-visible"))
+        if "network-icon-visible" in nautilus_desktop_keys:
+            sidePage.add_widget(GSettingsCheckButton(_("Network Servers icon visible on desktop"), "org.gnome.nautilus.desktop", "network-icon-visible"))
+        if "trash-icon-visible" in nautilus_desktop_keys:
+            sidePage.add_widget(GSettingsCheckButton(_("Trash icon visible on desktop"), "org.gnome.nautilus.desktop", "trash-icon-visible"))
+        if "volumes-visible" in nautilus_desktop_keys:
+            sidePage.add_widget(GSettingsCheckButton(_("Show mounted volumes on the desktop"), "org.gnome.nautilus.desktop", "volumes-visible"))        
         
         sidePage = SidePage(_("Windows"), "windows.svg", self.content_box)
         self.sidePages.append((sidePage, "windows"))
-        sidePage.add_widget(GConfComboBox(_("Action on title bar double-click"),
-                                            "/apps/metacity/general/action_double_click_titlebar",
-                                            [(i, i.replace("_", " ").title()) for i in ('toggle_shade', 'toggle_maximize', 'toggle_maximize_horizontally', 'toggle_maximize_vertically', 'minimize', 'shade', 'menu', 'lower', 'none')]))
-        sidePage.add_widget(GConfComboBox(_("Action on title bar middle-click"),
-                                            "/apps/metacity/general/action_middle_click_titlebar",
-                                            [(i, i.replace("_", " ").title()) for i in ('toggle_shade', 'toggle_maximize', 'toggle_maximize_horizontally', 'toggle_maximize_vertically', 'minimize', 'shade', 'menu', 'lower', 'none')]))
-        sidePage.add_widget(GConfComboBox(_("Action on title bar right-click"),
-                                            "/apps/metacity/general/action_right_click_titlebar",
-                                            [(i, i.replace("_", " ").title()) for i in ('toggle_shade', 'toggle_maximize', 'toggle_maximize_horizontally', 'toggle_maximize_vertically', 'minimize', 'shade', 'menu', 'lower', 'none')]))
-        sidePage.add_widget(GConfComboBox(_("Window focus mode"),
-                                            "/apps/metacity/general/focus_mode",
+        sidePage.add_widget(GSettingsComboBox(_("Action on title bar double-click"),
+                                            "org.gnome.desktop.wm.preferences", "action-double-click-titlebar",
+                                            [(i, i.replace("-", " ").title()) for i in ('toggle-shade', 'toggle-maximize', 'toggle-maximize-horizontally', 'toggle-maximize-vertically', 'minimize', 'shade', 'menu', 'lower', 'none')]))
+        sidePage.add_widget(GSettingsComboBox(_("Action on title bar middle-click"),
+                                            "org.gnome.desktop.wm.preferences", "action-middle-click-titlebar",
+                                            [(i, i.replace("-", " ").title()) for i in ('toggle-shade', 'toggle-maximize', 'toggle-maximize-horizontally', 'toggle-maximize-vertically', 'minimize', 'shade', 'menu', 'lower', 'none')]))
+        sidePage.add_widget(GSettingsComboBox(_("Action on title bar right-click"),
+                                            "org.gnome.desktop.wm.preferences", "action-right-click-titlebar",
+                                            [(i, i.replace("-", " ").title()) for i in ('toggle-shade', 'toggle-maximize', 'toggle-maximize-horizontally', 'toggle-maximize-vertically', 'minimize', 'shade', 'menu', 'lower', 'none')]))
+        sidePage.add_widget(GSettingsComboBox(_("Window focus mode"),
+                                            "org.gnome.desktop.wm.preferences", "focus-mode",
                                             [(i, i.title()) for i in ("click","sloppy","mouse")]))
-        sidePage.add_widget(TitleBarButtonsOrderSelector())
-        label = Gtk.Label()
-        label.set_markup("<i><small>%s</small></i>" % _("Note: If you change the title bar buttons order you will need to restart Cinnamon."))
-        sidePage.add_widget(label)
+
+        sidePage.add_widget(TitleBarButtonsOrderSelector())        
+        sidePage.add_widget(GSettingsCheckButton(_("Enable ALT+Tab outline and window preview"), "org.cinnamon", "enable-alttab-outline"))
+        sidePage.add_widget(GSettingsCheckButton(_("Enable Edge Tiling (\"Aero Snap\")"), "org.cinnamon.overrides", "edge-tiling"))
+        sidePage.add_widget(GSettingsCheckButton(_("Enable Edge Flip"), "org.cinnamon", "enable-edge-flip"))
+        sidePage.add_widget(GSettingsCheckButton(_("Attach dialog windows to their parent window's titlebar"), "org.cinnamon.overrides", "attach-modal-dialogs"))
+        
+        sidePage = SidePage(_("Workspaces"), "workspaces.svg", self.content_box)
+        self.sidePages.append((sidePage, "workspaces"))        
+        sidePage.add_widget(GSettingsCheckButton(_("Enable workspace OSD"), "org.cinnamon", "workspace-osd-visible"))
+        sidePage.add_widget(GSettingsSpinButton(_("Workspace OSD duration"), "org.cinnamon", "workspace-osd-duration", 0, 2000, 50, 400, _("milliseconds")))
+        sidePage.add_widget(GSettingsSpinButton(_("Workspace OSD horizontal position"), "org.cinnamon", "workspace-osd-x", 0, 100, 5, 50, _("percent of the monitor's width")))
+        sidePage.add_widget(GSettingsSpinButton(_("Workspace OSD vertical position"), "org.cinnamon", "workspace-osd-y", 0, 100, 5, 50, _("percent of the monitor's height")))
+        sidePage.add_widget(GSettingsCheckButton(_("Only use workspaces on primary monitor (requires Cinnamon restart)"), "org.cinnamon.overrides", "workspaces-only-on-primary"))
+        sidePage.add_widget(GSettingsCheckButton(_("Display Expo view as a grid"), "org.cinnamon", "workspace-expo-view-as-grid"))
         
         sidePage = SidePage(_("Fonts"), "fonts.svg", self.content_box)
         self.sidePages.append((sidePage, "fonts"))
@@ -1316,10 +1359,16 @@ class MainWindow:
         sidePage.add_widget(GSettingsFontButton(_("Default font"), "org.gnome.desktop.interface", "font-name"))
         sidePage.add_widget(GSettingsFontButton(_("Document font"), "org.gnome.desktop.interface", "document-font-name"))
         sidePage.add_widget(GSettingsFontButton(_("Monospace font"), "org.gnome.desktop.interface", "monospace-font-name"))
-        sidePage.add_widget(GConfFontButton(_("Window title font"), "/apps/metacity/general/titlebar_font"))
+        sidePage.add_widget(GSettingsFontButton(_("Window title font"), "org.gnome.desktop.wm.preferences", "titlebar-font"))
         sidePage.add_widget(GSettingsComboBox(_("Hinting"), "org.gnome.settings-daemon.plugins.xsettings", "hinting", [(i, i.title()) for i in ("none", "slight", "medium", "full")]))
         sidePage.add_widget(GSettingsComboBox(_("Antialiasing"), "org.gnome.settings-daemon.plugins.xsettings", "antialiasing", [(i, i.title()) for i in ("none", "grayscale", "rgba")]))
-                        
+        
+        sidePage = SidePage(_("General"), "general.svg", self.content_box)
+        self.sidePages.append((sidePage, "general"))
+        sidePage.add_widget(GSettingsCheckButton(_("Log LookingGlass output to ~/.cinnamon/glass.log (Requires Cinnamon restart)"), "org.cinnamon", "enable-looking-glass-logs"))
+        sidePage.add_widget(GSettingsCheckButton(_("Emulate middle click by clicking both left and right buttons"), "org.gnome.settings-daemon.peripherals.mouse", "middle-button-enabled"))
+        sidePage.add_widget(GSettingsCheckButton(_("Display notifications"), "org.cinnamon", "display-notifications"))
+        
         #sidePage = SidePage(_("Terminal"), "terminal", self.content_box)
         #self.sidePages.append(sidePage)
         #sidePage.add_widget(GConfCheckButton(_("Show fortune cookies"), "/desktop/linuxmint/terminal/show_fortunes"))

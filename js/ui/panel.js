@@ -8,32 +8,23 @@ const Pango = imports.gi.Pango;
 const Cinnamon = imports.gi.Cinnamon;
 const St = imports.gi.St;
 const PopupMenu = imports.ui.popupMenu;
-const PanelMenu = imports.ui.panelMenu;
 const Main = imports.ui.main;
 const Tweener = imports.ui.tweener;
 const Applet = imports.ui.applet;
 const DND = imports.ui.dnd;
 const AppletManager = imports.ui.appletManager;
-
-const PANEL_ICON_SIZE = 24;
-const PANEL_ICON_DEFAULT_SIZE = 22;
+const Util = imports.misc.util;
+const ModalDialog = imports.ui.modalDialog;
+const Gtk = imports.gi.Gtk;
 
 const BUTTON_DND_ACTIVATION_TIMEOUT = 250;
 
 const ANIMATED_ICON_UPDATE_TIMEOUT = 100;
 const SPINNER_ANIMATION_TIME = 0.2;
 
-const STANDARD_STATUS_AREA_ORDER = [];
-const STANDARD_STATUS_AREA_CINNAMON_IMPLEMENTATION = {};
-
 const PANEL_HEIGHT = 25;
 const AUTOHIDE_ANIMATION_TIME = 0.2;
 const TIME_DELTA = 1500;
-
-const GDM_STATUS_AREA_ORDER = ['display', 'powerMenu'];
-const GDM_STATUS_AREA_CINNAMON_IMPLEMENTATION = {        
-    'powerMenu': imports.gdm.powerMenu.PowerMenuButton
-};
 
 const APPLETS_DROP_ANIMATION_TIME = 0.2;
 
@@ -144,12 +135,6 @@ TextShadower.prototype = {
         this._label.raise_top();
     },
 
-    setText: function(text) {
-        let children = this.actor.get_children();
-        for (let i = 0; i < children.length; i++)
-            children[i].set_text(text);
-    },
-
     _getPreferredWidth: function(actor, forHeight, alloc) {
         let [minWidth, natWidth] = this._label.get_preferred_width(forHeight);
         alloc.min_size = minWidth + 2;
@@ -236,7 +221,7 @@ PanelCorner.prototype = {
 
         // Start at the back and work backward
         let index = children.length - 1;
-        while (!children[index].visible && index >= 0)
+        while (index >= 0 && !children[index].visible)
             index--;
 
         if (index < 0)
@@ -256,7 +241,7 @@ PanelCorner.prototype = {
 
         // Start at the front and work forward
         let index = 0;
-        while (!children[index].visible && index < children.length)
+        while (index < children.length && !children[index].visible)
             index++;
 
         if (index == children.length)
@@ -383,18 +368,130 @@ PanelCorner.prototype = {
     }
 };
 
+function ConfirmDialog(){
+    this._init();
+}
+
+ConfirmDialog.prototype = {
+    __proto__: ModalDialog.ModalDialog.prototype,
+
+    _init: function(){
+	ModalDialog.ModalDialog.prototype._init.call(this);
+	let label = new St.Label({text: "Are you sure you want to restore all settings to default?\n\n"});
+	this.contentLayout.add(label);
+
+	this.setButtons([
+	    {
+		label: _("Yes"),
+		action: Lang.bind(this, function(){
+                    Util.spawnCommandLine("gsettings reset-recursively org.cinnamon");
+                    global.reexec_self();
+		})
+	    },
+	    {
+		label: _("No"),
+		action: Lang.bind(this, function(){
+		    this.close();
+		})
+	    }
+	]);
+    },
+};
+function SettingsLauncher(label, keyword, icon, menu) {
+    this._init(label, keyword, icon, menu);
+}
+
+SettingsLauncher.prototype = {
+    __proto__: PopupMenu.PopupBaseMenuItem.prototype,
+
+    _init: function (label, keyword, icon, menu) {
+        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, {});
+
+        this._menu = menu;
+        this._keyword = keyword;
+        this.label = new St.Label({ text: label });
+        this.addActor(this.label);
+        this._icon = new St.Icon({icon_name: icon, icon_size: 22, icon_type: St.IconType.FULLCOLOR });
+        this.addActor(this._icon, { expand: true });
+    },
+
+    activate: function (event) {
+    	this._menu.actor.hide();
+        Util.spawnCommandLine("cinnamon-settings " + this._keyword);
+        return true;
+    }
+
+};
+
+function populateSettingsMenu(menu) {
+    menu.settingsItem = new PopupMenu.PopupSubMenuMenuItem(_("Settings"));
+
+    let menuItem = new SettingsLauncher(_("Themes"), "themes", "themes", menu.settingsItem.menu);
+    menu.settingsItem.menu.addMenuItem(menuItem);
+
+    menuItem = new SettingsLauncher(_("Applets"), "applets", "applets", menu.settingsItem.menu);
+    menu.settingsItem.menu.addMenuItem(menuItem);
+
+    menuItem = new SettingsLauncher(_("Panel"), "panel", "panel", menu.settingsItem.menu);
+    menu.settingsItem.menu.addMenuItem(menuItem);
+
+    menuItem = new SettingsLauncher(_("Menu"), "menu", "menu", menu.settingsItem.menu);
+    menu.settingsItem.menu.addMenuItem(menuItem);
+
+    menuItem = new SettingsLauncher(_("All settings"), "", "preferences-system", menu.settingsItem.menu);
+    menu.settingsItem.menu.addMenuItem(menuItem);
+
+    menu.addMenuItem(menu.settingsItem);
+
+    menu.troubleshootItem = new PopupMenu.PopupSubMenuMenuItem(_("Troubleshoot"));
+    menu.troubleshootItem.menu.addAction(_("Restart Cinnamon"), function(event) {
+        global.reexec_self();
+    });
+
+    menu.troubleshootItem.menu.addAction(_("Looking Glass"), function(event) {
+        Main.createLookingGlass().open();
+    });
+
+    menu.troubleshootItem.menu.addAction(_("Restore all settings to default"), function(event) {
+        let confirm = new ConfirmDialog();
+        confirm.open();
+    });
+
+    menu.addMenuItem(menu.troubleshootItem);
+
+    menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+    let editMode = global.settings.get_boolean("panel-edit-mode");
+    let panelEditMode = new PopupMenu.PopupSwitchMenuItem(_("Panel Edit mode"), editMode);
+    panelEditMode.connect('toggled', function(item) {
+        global.settings.set_boolean("panel-edit-mode", item.state);
+    });
+    menu.addMenuItem(panelEditMode);
+    global.settings.connect('changed::panel-edit-mode', function() {
+        panelEditMode.setToggleState(global.settings.get_boolean("panel-edit-mode"));
+    });
+}
+
 function PanelContextMenu(launcher, orientation) {
     this._init(launcher, orientation);
 }
 
 PanelContextMenu.prototype = {
     __proto__: PopupMenu.PopupMenu.prototype,
-    
-    _init: function(launcher, orientation) {    
+
+    _init: function(launcher, orientation) {
         PopupMenu.PopupMenu.prototype._init.call(this, launcher.actor, 0.0, orientation, 0);
         Main.uiGroup.add_actor(this.actor);
-        this.actor.hide();                    
-    }    
+        this.actor.hide();
+
+        populateSettingsMenu(this);
+
+        let menuItem = new SettingsLauncher(_("Panel settings"), "panel", "panel", this);
+        this.addMenuItem(menuItem);
+
+        let applet_settings_item = new SettingsLauncher(_("Add applets to the panel"), "applets", "applets", this);
+        this.addMenuItem(applet_settings_item);
+    }
 }
 
 function PanelZoneDNDHandler(panelZone){
@@ -409,21 +506,21 @@ PanelZoneDNDHandler.prototype = {
         this._dragPlaceholderPos = -1;
         this._animatingPlaceholdersCount = 0;
     },
-    
+
     handleDragOver: function(source, actor, x, y, time) {
         if (!(source instanceof Applet.Applet)) return DND.DragMotionResult.NO_DROP;
-                       
+
         let children = this._panelZone.get_children();
         let appletPos = children.indexOf(source.actor);
-        
+
         let pos = 0;
-        
+
         for (var i in children){
             //if (children[i] == this._dragPlaceholder.actor) continue;
             if (x > children[i].get_allocation_box().x1 + children[i].width / 2) pos = i;
         }
-        
-        if (pos != this._dragPlaceholderPos) {            
+
+        if (pos != this._dragPlaceholderPos) {
             this._dragPlaceholderPos = pos;
 
             // Don't allow positioning before or after self
@@ -460,13 +557,13 @@ PanelZoneDNDHandler.prototype = {
             if (fadeIn)
                 this._dragPlaceholder.animateIn();
         }
-        
+
         return DND.DragMotionResult.MOVE_DROP;
     },
-    
-    acceptDrop: function(source, actor, x, y, time) {      
+
+    acceptDrop: function(source, actor, x, y, time) {
         if (!(source instanceof Applet.Applet)) return false;
-          
+
         let children = this._panelZone.get_children();
         let curAppletPos = 0;
         let insertAppletPos;
@@ -486,8 +583,8 @@ PanelZoneDNDHandler.prototype = {
         AppletManager.saveAppletsPositions();
         return true;
     },
-    
-    _clearDragPlaceholder: function() {        
+
+    _clearDragPlaceholder: function() {
         if (this._dragPlaceholder) {
             this._dragPlaceholder.animateOutAndDestroy();
             this._dragPlaceholder = null;
@@ -503,20 +600,31 @@ function Panel(bottomPosition) {
 
 Panel.prototype = {
     _init : function(bottomPosition) {
-    	
+
+        Gtk.IconTheme.get_default().append_search_path("/usr/lib/cinnamon-settings/data/icons/");
+
         this.bottomPosition = bottomPosition;
-        
+
     	this._hidden = false;
-        this._hidetime = 0;              
+        this._hidetime = 0;
         this._hideable = global.settings.get_boolean("panel-autohide");
-    	
+        this._hideTimer = false;
+        this._showTimer = false;
+        this._showDelay = global.settings.get_boolean("panel-show-delay");
+        this._hideDelay = global.settings.get_boolean("panel-hide-delay");
+
         this.actor = new Cinnamon.GenericContainer({ name: 'panel',
                                                   reactive: true });
         this.actor._delegate = this;
 
-        
-
-        this._statusArea = {};
+        if (global.settings.get_boolean('panel-resizable')) {
+            if (bottomPosition) {
+                this.actor.set_height(global.settings.get_int('panel-bottom-height'));
+            }
+            else {
+                this.actor.set_height(global.settings.get_int('panel-top-height'));
+            }
+        }
 
         Main.overview.connect('shown', Lang.bind(this, function () {
             this.actor.add_style_class_name('in-overview');
@@ -525,8 +633,15 @@ Panel.prototype = {
             this.actor.remove_style_class_name('in-overview');
         }));
 
-        this._menus = new PopupMenu.PopupMenuManager(this);                        
-        
+        Main.expo.connect('shown', Lang.bind(this, function () {
+            this.actor.add_style_class_name('in-overview');
+        }));
+        Main.expo.connect('hiding', Lang.bind(this, function () {
+            this.actor.remove_style_class_name('in-overview');
+        }));
+
+        this._menus = new PopupMenu.PopupMenuManager(this);
+
         this._leftBox = new St.BoxLayout({ name: 'panelLeft' });
         this.actor.add_actor(this._leftBox);
         this._leftBoxDNDHandler = new PanelZoneDNDHandler(this._leftBox);
@@ -554,38 +669,37 @@ Panel.prototype = {
         this.actor.connect('get-preferred-height', Lang.bind(this, this._getPreferredHeight));
         this.actor.connect('allocate', Lang.bind(this, this._allocate));
 
-            
         /* right */
-        if (global.session_type == Cinnamon.SessionType.GDM) {
-            this._status_area_order = GDM_STATUS_AREA_ORDER;
-            this._status_area_cinnamon_implementation = GDM_STATUS_AREA_CINNAMON_IMPLEMENTATION;
-        } else {
-            this._status_area_order = STANDARD_STATUS_AREA_ORDER;
-            this._status_area_cinnamon_implementation = STANDARD_STATUS_AREA_CINNAMON_IMPLEMENTATION;
-        }
-
-        //Main.statusIconDispatcher.connect('status-icon-added', Lang.bind(this, this._onTrayIconAdded));
-        //Main.statusIconDispatcher.connect('status-icon-removed', Lang.bind(this, this._onTrayIconRemoved));        
+        this._status_area_order = [];
+        this._status_area_cinnamon_implementation = {};
                                         
         this.actor.connect('leave-event', Lang.bind(this, this._leavePanel));
         this.actor.connect('enter-event', Lang.bind(this, this._enterPanel));  
         global.settings.connect("changed::panel-autohide", Lang.bind(this, this._onPanelAutoHideChanged));   
+        global.settings.connect("changed::panel-show-delay", Lang.bind(this, this._onPanelShowDelayChanged));   
+        global.settings.connect("changed::panel-hide-delay", Lang.bind(this, this._onPanelHideDelayChanged));   
         
-        //let orientation = St.Side.TOP;
-        //if (bottomPosition) {
-        //    orientation = St.Side.BOTTOM;
-        //}
+        let orientation = St.Side.TOP;
+        if (bottomPosition) {
+            orientation = St.Side.BOTTOM;
+        }
         
-        //this._context_menu = new PanelContextMenu(this, orientation);
-        //this._menus.addMenu(this._context_menu);   
-        //this._context_menu.addMenuItem(new PopupMenu.PopupMenuItem(_("Add applet")));
+        this._context_menu = new PanelContextMenu(this, orientation);
+        this._menus.addMenu(this._context_menu);   
         
-        //this.actor.connect('button-release-event', Lang.bind(this, this._onButtonReleaseEvent)); 
+        this._context_menu._boxPointer._container.connect('allocate', Lang.bind(this._context_menu._boxPointer, function(actor, box, flags){
+                    this._xPosition = this._xpos;
+                    this._shiftActor();
+        }));
+
+        this.actor.connect('button-release-event', Lang.bind(this, this._onButtonReleaseEvent));                            
         
         this._setDNDstyle();
-        global.settings.connect("changed::panel-edit-mode", Lang.bind(this, this._setDNDstyle));   
+        global.settings.connect("changed::panel-edit-mode", Lang.bind(this, this._setDNDstyle));
+        global.settings.connect("changed::panel-resizable", Lang.bind(this, this._onPanelResizableChanged));
+        this.actor.connect('style-changed', Lang.bind(this, this._onStyleChanged));
     },
-    
+
     _setDNDstyle: function() {
         if (global.settings.get_boolean("panel-edit-mode")) {
             this._leftBox.add_style_pseudo_class('dnd');
@@ -597,22 +711,57 @@ Panel.prototype = {
             this._centerBox.remove_style_pseudo_class('dnd');
             this._rightBox.remove_style_pseudo_class('dnd');
         }
-    },    
-            
-    _onButtonReleaseEvent: function (actor, event) {                      
+    },
+
+    _onButtonReleaseEvent: function (actor, event) {
         if (event.get_button()==1){
             if (this._context_menu.isOpen) {
-                this._context_menu.toggle(); 
-            }            
-        }
-        if (event.get_button()==3){            
-            if (this._context_menu._getMenuItems().length > 0) {
-                this._context_menu.toggle();			
+                this._context_menu.toggle();
             }
         }
-        return true;
+        if (event.get_button()==3){
+            global.log("3");
+            try {
+            let [x, y] = event.get_coords();
+            let target = global.stage.get_actor_at_pos(Clutter.PickMode.ALL, x, y);
+            if (this._context_menu._getMenuItems().length > 0 && target.get_parent() == this.actor) { 
+                this._context_menu.toggle();
+                if (!this._context_menu.isOpen) {
+                    return;
+                }
+
+                x -= this._context_menu._boxPointer._arrowOrigin;
+
+                let monitor = Main.layoutManager.findMonitorForActor(this._context_menu._boxPointer.actor);
+
+                let mywidth = this._context_menu._boxPointer.actor.get_allocation_box().x2-this._context_menu._boxPointer.actor.get_allocation_box().x1;//Width of menu
+
+                if (x + mywidth - monitor.x > monitor.width) {
+                    x  = monitor.width + monitor.x - mywidth;
+                }
+                if (x < monitor.x) {
+                    x = monitor.x;
+                }
+                this._context_menu._boxPointer._xpos = Math.round(x);
+                this._context_menu._boxPointer._xPosition = this._context_menu._boxPointer._xpos;
+                this._context_menu._boxPointer._shiftActor();
+            }
+        }
+        catch(e) {
+            global.log(e);
+        }
+        }
+        return;
     },
         
+    _onPanelShowDelayChanged: function() {  
+       this._showDelay = global.settings.get_int("panel-show-delay");
+    },
+    
+    _onPanelHideDelayChanged: function() {  
+       this._hideDelay = global.settings.get_int("panel-hide-delay");
+    },
+    
     _onPanelAutoHideChanged: function() {  
     	this._hideable = global.settings.get_boolean("panel-autohide");
     	if (this._hidden == true && this._hideable == false) {
@@ -621,6 +770,47 @@ Panel.prototype = {
     	if (this._hidden == false && this._hideable == true) {
     		this._hidePanel();
     	}
+    },
+
+    _onPanelSizeChanged: function() {
+        let panelHeight;
+        if (this.bottomPosition) {
+            panelHeight = global.settings.get_int("panel-bottom-height");
+        }
+        else {
+            panelHeight = global.settings.get_int("panel-top-height");
+        }
+        this.actor.set_height(panelHeight);
+        Main.layoutManager._updateBoxes();
+    },
+
+    _onPanelResizableChanged: function() {
+        let panelResizable = global.settings.get_boolean("panel-resizable");
+        if (panelResizable) {
+            if (this.bottomPosition) {
+                this._onPanelSizeChangedId = global.settings.connect("changed::panel-bottom-height", Lang.bind(this, this._onPanelSizeChanged));
+            }
+            else {
+                this._onPanelSizeChangedId = global.settings.connect("changed::panel-top-height", Lang.bind(this, this._onPanelSizeChanged));
+            }
+            this._onPanelSizeChanged();
+        }
+        else {
+            if (this._onPanelSizeChangedId) {
+                global.settings.disconnect(this._onPanelSizeChangedId);
+            }
+            let themeNode = this.actor.get_theme_node();
+            let panelHeight = themeNode.get_length("height");
+            if (!panelHeight || panelHeight == 0) {
+                panelHeight = 25;
+            }
+            this.actor.set_height(panelHeight);
+            Main.layoutManager._updateBoxes();
+        }
+    },
+
+    _onStyleChanged: function() {
+        this._onPanelResizableChanged();
     },
 
     _getPreferredWidth: function(actor, forHeight, alloc) {
@@ -641,50 +831,72 @@ Panel.prototype = {
         let [leftMinWidth, leftNaturalWidth] = this._leftBox.get_preferred_width(-1);
         let [centerMinWidth, centerNaturalWidth] = this._centerBox.get_preferred_width(-1);
         let [rightMinWidth, rightNaturalWidth] = this._rightBox.get_preferred_width(-1);
-              
-        let sideWidth = allocWidth - rightNaturalWidth - centerNaturalWidth;
+
+        let leftWidth = Math.max(leftNaturalWidth, 25);
+        let centerWidth = centerMinWidth;
+        let rightWidth = Math.max(rightNaturalWidth, 25);
+
+        let space_needed = leftWidth + centerWidth + rightWidth;
+        if (space_needed <= allocWidth) {
+            // If we've more space than we need, expand the center zone
+            let space_left = allocWidth - space_needed;
+            centerWidth = centerWidth + space_left;
+        }
+        else {
+            let space_missing = space_needed - allocWidth;
+            // If there isn't enough space, reduce the size of the largest zone (likely to contain more shrinkable content)
+            if (leftWidth >= centerWidth && leftWidth >= rightWidth) {
+                leftWidth = Math.max(leftWidth - space_missing, leftMinWidth);
+            }
+            else if (centerWidth >= rightWidth) {
+                centerWidth = Math.max(centerWidth - space_mising, centerMinWidth);
+            }
+            else {
+                rightWidth = Math.max(rightWidth - space_missing, rightMinWidth);
+            }
+        }
+
+        let leftBoundary = leftWidth;
+        let rightBoundary = allocWidth - rightWidth;
+        if (this.actor.get_direction() == St.TextDirection.RTL) {
+            leftBoundary = allocWidth - leftWidth;
+            rightBoundary = rightWidth;
+        }
 
         let childBox = new Clutter.ActorBox();
 
-        let leftBoxBoundary = 0;
-        let rightBoxBoundary = 0;
-
-        childBox.y1 = 0;
-        childBox.y2 = allocHeight;        
-        if (this.actor.get_direction() == St.TextDirection.RTL) {
-            childBox.x1 = allocWidth - Math.max(Math.min(Math.floor(sideWidth), leftNaturalWidth), 25);
-            childBox.x2 = allocWidth;
-            leftBoxBoundary = childBox.x1;
-        } else {
-            childBox.x1 = 0;
-            childBox.x2 = Math.max(Math.min(Math.floor(sideWidth), leftNaturalWidth), 25); // Min size for zone is 25px
-            leftBoxBoundary = childBox.x2;
-        }        
-        this._leftBox.allocate(childBox, flags);        
-
         childBox.y1 = 0;
         childBox.y2 = allocHeight;
         if (this.actor.get_direction() == St.TextDirection.RTL) {
-            childBox.x1 = 0;
-            childBox.x2 = Math.max(rightNaturalWidth, 25);
-            rightBoxBoundary = childBox.x2;
-        } else {
-            childBox.x1 = allocWidth - Math.max(rightNaturalWidth, 25); // Min size for zone is 25px
+            childBox.x1 = leftBoundary;
             childBox.x2 = allocWidth;
-            rightBoxBoundary = childBox.x1;
+        } else {
+            childBox.x1 = 0;
+            childBox.x2 = leftBoundary;
         }
-        this._rightBox.allocate(childBox, flags);
-        
+        this._leftBox.allocate(childBox, flags);
+
         childBox.y1 = 0;
         childBox.y2 = allocHeight;
         if (this.actor.get_direction() == St.TextDirection.RTL) {
-            childBox.x1 = rightBoxBoundary;
-            childBox.x2 = leftBoxBoundary;
+            childBox.x1 = rightBoundary;
+            childBox.x2 = leftBoundary;
         } else {
-            childBox.x1 = leftBoxBoundary;
-            childBox.x2 = rightBoxBoundary;
+            childBox.x1 = leftBoundary;
+            childBox.x2 = rightBoundary;
         }
         this._centerBox.allocate(childBox, flags);
+
+        childBox.y1 = 0;
+        childBox.y2 = allocHeight;
+        if (this.actor.get_direction() == St.TextDirection.RTL) {
+            childBox.x1 = 0;
+            childBox.x2 = rightBoundary;
+        } else {
+            childBox.x1 = rightBoundary;
+            childBox.x2 = allocWidth;
+        }
+        this._rightBox.allocate(childBox, flags);
 
         let [cornerMinWidth, cornerWidth] = this._leftCorner.actor.get_preferred_width(-1);
         let [cornerMinHeight, cornerHeight] = this._leftCorner.actor.get_preferred_width(-1);
@@ -702,118 +914,63 @@ Panel.prototype = {
         childBox.y2 = allocHeight + cornerHeight;
         this._rightCorner.actor.allocate(childBox, flags);
     },
-
-    startStatusArea: function() {
-        for (let i = 0; i < this._status_area_order.length; i++) {
-            let role = this._status_area_order[i];
-            let constructor = this._status_area_cinnamon_implementation[role];
-            if (!constructor) {
-                // This icon is not implemented (this is a bug)
-                continue;
-            }
-
-            let indicator = new constructor();
-            this.addToStatusArea(role, indicator, i);
+    
+    _clearTimers: function() {
+        if (this._showTimer) {
+            Mainloop.source_remove(this._showTimer);
         }
-    },
-
-    _insertStatusItem: function(actor, position) {
-        let children = this._rightBox.get_children();
-        let i;
-        for (i = children.length - 1; i >= 0; i--) {
-            let rolePosition = children[i]._rolePosition;
-            if (position > rolePosition) {
-                this._rightBox.insert_actor(actor, i + 1);
-                break;
-            }
+        if (this._hideTimer) {
+            Mainloop.source_remove(this._hideTimer);
         }
-        if (i == -1) {
-            // If we didn't find a position, we must be first
-            this._rightBox.insert_actor(actor, 0);
-        }
-        actor._rolePosition = position;
-    },
-
-    addToStatusArea: function(role, indicator, position) {
-        if (this._statusArea[role])
-            throw new Error('Extension point conflict: there is already a status indicator for role ' + role);
-
-        if (!(indicator instanceof PanelMenu.Button))
-            throw new TypeError('Status indicator must be an instance of PanelMenu.Button');
-
-        if (!position)
-            position = 0;
-        this._insertStatusItem(indicator.actor, position);
-        this._menus.addMenu(indicator.menu);
-
-        this._statusArea[role] = indicator;
-        let destroyId = indicator.connect('destroy', Lang.bind(this, function(emitter) {
-            this._statusArea[role] = null;
-            emitter.disconnect(destroyId);
-        }));
-
-        return indicator;
-    },
-
-    _onTrayIconAdded: function(o, icon, role) {
-        if (this._status_area_cinnamon_implementation[role]) {
-            // This icon is legacy, and replaced by a Cinnamon version
-            // Hide it
-            return;
-        }
-        
-        let hiddenIcons = ["network", "power", "keyboard", "gnome-settings-daemon", "volume", "bluetooth", "battery", "a11y"];
-        
-        if (hiddenIcons.indexOf(role) != -1 ) {  
-            // We've got an applet for that          
-            return;
-        }
-
-        //icon.height = PANEL_ICON_SIZE;        
-        let buttonBox = new PanelMenu.ButtonBox({ style_class: 'panel-status-button' });
-        let box = buttonBox.actor;
-        box.add_actor(icon);
-
-        this._insertStatusItem(box, this._status_area_order.indexOf(role));
-        
-        let themeNode = buttonBox.actor.get_theme_node();
-        if (!themeNode.get_length('height')) icon.height = PANEL_ICON_DEFAULT_SIZE;
-        else icon.height = themeNode.get_length('height');
-    },
-
-    _onTrayIconRemoved: function(o, icon) {
-        let box = icon.get_parent();
-        if (box && box._delegate instanceof PanelMenu.ButtonBox)
-            box.destroy();
     },
     
     _enterPanel: function() {
         this.isMouseOverPanel = true;
-        this._showPanel();
+        this._clearTimers();
+        if (this._showDelay > 0) {
+            this._showTimer = Mainloop.timeout_add(this._hideDelay, Lang.bind(this, this._showPanel));
+        }
+        else {
+            this._showPanel();
+        }
     },
 
     _leavePanel:function() {
         this.isMouseOverPanel = false;
-        this._hidePanel();
+        this._clearTimers();
+        if (this._hideDelay > 0) {
+            this._clearTimers();
+            this._hideTimer = Mainloop.timeout_add(this._hideDelay, Lang.bind(this, this._hidePanel));
+        }
+        else {
+            this._hidePanel();
+        }
     }, 
-    
+
+
     _showPanel: function() {
         if (this._hidden == false) return;
-        
+
+        if (Main.lookingGlass != null && Main.lookingGlass._open) {
+            return;
+        }
+
         // Force the panel to be on top (hack to correct issues when switching workspace)
         Main.layoutManager._windowsRestacked();
-        
-        if (this.bottomPosition) {        
-            let params = { y: PANEL_HEIGHT - 1,
+
+        let height = this.actor.get_height();
+
+        if (this.bottomPosition) {
+            let params = { y: height - 1,
                            time: AUTOHIDE_ANIMATION_TIME + 0.1,
                            transition: 'easeOutQuad'
                          };
-     
+
             Tweener.addTween(this._leftCorner.actor, params);
             Tweener.addTween(this._rightCorner.actor, params);
 
             Tweener.addTween(this.actor.get_parent(),
-                         { y: Main.layoutManager.bottomMonitor.y + Main.layoutManager.bottomMonitor.height - PANEL_HEIGHT,
+                         { y: Main.layoutManager.bottomMonitor.y + Main.layoutManager.bottomMonitor.height - height,
                            time: AUTOHIDE_ANIMATION_TIME,
                            transition: 'easeOutQuad',
                            onUpdate: function() {
@@ -832,11 +989,11 @@ Panel.prototype = {
             Tweener.addTween(this._rightBox, params);
         }
         else {
-            let params = { y: PANEL_HEIGHT - 1,
+            let params = { y: height - 1,
                        time: AUTOHIDE_ANIMATION_TIME + 0.1,
                        transition: 'easeOutQuad'
                      };
- 
+
             Tweener.addTween(this._leftCorner.actor, params);
             Tweener.addTween(this._rightCorner.actor, params);
 
@@ -862,14 +1019,16 @@ Panel.prototype = {
 
         this._hidden = false;
     },
-    
+
     _hidePanel: function() {
         if (Main.overview.visible || this._hideable == false || global.menuStackLength > 0 || this.isMouseOverPanel) return;
-        
+
         // Force the panel to be on top (hack to correct issues when switching workspace)
         Main.layoutManager._windowsRestacked();
 
-        if (this.bottomPosition) {  
+        let height = this.actor.get_height();
+
+        if (this.bottomPosition) {
             Tweener.addTween(this.actor.get_parent(),
                          { y: Main.layoutManager.bottomMonitor.y + Main.layoutManager.bottomMonitor.height - 1,
                            time: AUTOHIDE_ANIMATION_TIME,
@@ -899,7 +1058,7 @@ Panel.prototype = {
         }
         else {
             Tweener.addTween(this.actor.get_parent(),
-                     { y: Main.layoutManager.primaryMonitor.y - PANEL_HEIGHT + 1,
+                     { y: Main.layoutManager.primaryMonitor.y - height + 1,
                        time: AUTOHIDE_ANIMATION_TIME,
                        transition: 'easeOutQuad',
                        onUpdate: function() {

@@ -147,6 +147,7 @@ st_align_get_type(void) {
         { ST_ALIGN_START, "ST_ALIGN_START", "start" },
         { ST_ALIGN_MIDDLE, "ST_ALIGN_MIDDLE", "middle" },
         { ST_ALIGN_END, "ST_ALIGN_END", "end" },
+        { ST_ALIGN_CENTER_SPECIAL, "ST_ALIGN_CENTER_SPECIAL", "center-special" },
         { 0, NULL, NULL }
       };
       enum_type_id = g_enum_register_static (g_intern_static_string ("StAlign"), values);
@@ -163,6 +164,7 @@ st_icon_type_get_type(void) {
         { ST_ICON_FULLCOLOR, "ST_ICON_FULLCOLOR", "fullcolor" },
         { ST_ICON_APPLICATION, "ST_ICON_APPLICATION", "application" },
         { ST_ICON_DOCUMENT, "ST_ICON_DOCUMENT", "document" },
+        { ST_ICON_FADED, "ST_ICON_FADED", "faded" },
         { 0, NULL, NULL }
       };
       enum_type_id = g_enum_register_static (g_intern_static_string ("StIconType"), values);

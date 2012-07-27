@@ -71,7 +71,6 @@ CLEANFILES += cinnamon $(bin_SCRIPTS)
 include Makefile-st.am
 include Makefile-tray.am
 include Makefile-gvc.am
-include Makefile-calendar-server.am
 include Makefile-hotplug-sniffer.am
 
 cinnamon_cflags =				\
@@ -102,7 +101,6 @@ cinnamon_public_headers_h =		\
 	cinnamon-app-system.h		\
 	cinnamon-app-usage.h		\
 	cinnamon-arrow.h			\
-	cinnamon-contact-system.h	\
 	cinnamon-doc-system.h		\
 	cinnamon-embedded-window.h		\
 	cinnamon-generic-container.h	\
@@ -114,7 +112,6 @@ cinnamon_public_headers_h =		\
 	cinnamon-perf-log.h		\
 	cinnamon-slicer.h			\
 	cinnamon-stack.h			\
-	cinnamon-tp-client.h		\
 	cinnamon-tray-icon.h		\
 	cinnamon-tray-manager.h		\
 	cinnamon-util.h			\
@@ -139,7 +136,6 @@ libcinnamon_la_SOURCES =		\
 	cinnamon-app-system.c		\
 	cinnamon-app-usage.c		\
 	cinnamon-arrow.c			\
-	cinnamon-contact-system.c	\
 	cinnamon-doc-system.c		\
 	cinnamon-embedded-window.c		\
 	cinnamon-generic-container.c	\
@@ -153,7 +149,6 @@ libcinnamon_la_SOURCES =		\
 	cinnamon-polkit-authentication-agent.c	\
 	cinnamon-slicer.c			\
 	cinnamon-stack.c			\
-	cinnamon-tp-client.c			\
 	cinnamon-tray-icon.c		\
 	cinnamon-tray-manager.c		\
 	cinnamon-util.c			\
@@ -272,12 +267,12 @@ libcinnamon_la_LIBADD =		\
 libcinnamon_la_CPPFLAGS = $(cinnamon_cflags)
 
 Cinnamon-0.1.gir: libcinnamon.la St-1.0.gir
-Cinnamon_0_1_gir_INCLUDES = Clutter-1.0 ClutterX11-1.0 Meta-3.0 TelepathyGLib-0.12 TelepathyLogger-0.2 Soup-2.4 GMenu-3.0 NetworkManager-1.0 NMClient-1.0 Folks-0.6
+Cinnamon_0_1_gir_INCLUDES = Clutter-1.0 ClutterX11-1.0 Meta-3.0 Soup-2.4 GMenu-3.0 NetworkManager-1.0 NMClient-1.0
 Cinnamon_0_1_gir_CFLAGS = $(libcinnamon_la_CPPFLAGS) -I $(srcdir)
 Cinnamon_0_1_gir_LIBS = libcinnamon.la
 Cinnamon_0_1_gir_FILES = $(libcinnamon_la_gir_sources)
 Cinnamon_0_1_gir_SCANNERFLAGS = --include-uninstalled=$(builddir)/St-1.0.gir \
-	--add-include-path=$(MUFFIN_GIR_DIR)
+	--add-include-path=$(MUFFIN_GIR_DIR) -L $(BLUETOOTH_DIR)
 INTROSPECTION_GIRS += Cinnamon-0.1.gir
 CLEANFILES += Cinnamon-0.1.gir
 

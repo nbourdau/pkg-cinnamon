@@ -20,17 +20,16 @@ dist_searchproviders_DATA =				\
 themedir = $(pkgdatadir)/theme
 dist_theme_DATA = \
 	theme/add-workspace.png			\
+	theme/add-workspace-hover.png		\
 	theme/calendar-arrow-left.svg		\
 	theme/calendar-arrow-right.svg		\
 	theme/calendar-today.svg		\
 	theme/close-window.svg			\
 	theme/close.svg				\
-	theme/corner-ripple-ltr.png		\
-	theme/corner-ripple-rtl.png		\
+	theme/corner-ripple.png			\
 	theme/dash-placeholder.svg		\
 	theme/filter-selected-ltr.svg		\
 	theme/filter-selected-rtl.svg		\
-	theme/gdm.css				\
 	theme/cinnamon.css			\
 	theme/menu.png				\
 	theme/overview.png			\
@@ -50,6 +49,7 @@ dist_theme_DATA = \
 	theme/toggle-off-intl.svg		\
 	theme/toggle-on-us.svg			\
 	theme/toggle-on-intl.svg		\
+	theme/trash-icon.png			\
 	theme/ws-switch-arrow-up.svg		\
 	theme/ws-switch-arrow-down.svg		\
 	theme/player-paused.svg		\
@@ -69,23 +69,14 @@ gschemas.compiled: $(gsettings_SCHEMAS:.xml=.valid)
 all-local: gschemas.compiled
 
 
-# GConf schemas: provide defaults for keys from Metacity we are overriding
-gconfschemadir  = @GCONF_SCHEMA_FILE_DIR@
-gconfschema_DATA = cinnamon.schemas
-
 shadersdir = $(pkgdatadir)/shaders
 shaders_DATA = \
 	shaders/dim-window.glsl
-
-install-data-local:
-	GCONF_CONFIG_SOURCE=$(GCONF_SCHEMA_CONFIG_SOURCE) $(GCONFTOOL) --makefile-install-rule $(srcdir)/$(gconfschema_DATA)
-
 
 
 EXTRA_DIST =						\
 	cinnamon.desktop.in.in			\
 	$(menu_DATA)					\
-	$(gconfschema_DATA)				\
 	$(shaders_DATA)					\
 	org.cinnamon.gschema.xml.in
 

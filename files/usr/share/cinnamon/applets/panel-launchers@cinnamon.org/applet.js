@@ -11,6 +11,7 @@ const Signals = imports.signals;
 const GLib = imports.gi.GLib;
 const Tooltips = imports.ui.tooltips;
 const DND = imports.ui.dnd;
+const Tweener = imports.ui.tweener;
 
 let pressLauncher = null;
 
@@ -145,7 +146,34 @@ PanelAppLauncher.prototype = {
         else return this.app.create_icon_texture(20);
     },
     
+    _animateIcon: function(step){
+        if (step>=3) return;
+        Tweener.addTween(this.icon,
+                         { width: 13,
+                           height: 13,
+                           time: 0.2,
+                           transition: 'easeOutQuad',
+                           onComplete: function(){
+                               Tweener.addTween(this.icon,
+                                                 { width: 20,
+                                                   height: 20,
+                                                   time: 0.2,
+                                                   transition: 'easeOutQuad',
+                                                   onComplete: function(){
+                                                       this._animateIcon(step+1);
+                                                   },
+                                                   onCompleteScope: this
+                                                 });
+                           },
+                           onCompleteScope: this
+                         });
+    },
+    
     launch: function() {
+        let allocation = this._iconBox.get_allocation_box();
+        this._iconBox.width = allocation.x2 - allocation.x1;
+        this._iconBox.height = allocation.y2 - allocation.y1;
+        this._animateIcon(0);
         if (this.is_custom()) this.appinfo.launch([], null);
         else this.app.open_new_window(-1);
     },
@@ -401,7 +429,7 @@ MyApplet.prototype = {
                                             style_class: 'panel-launchers-box' });           
             
             this._settings = new Gio.Settings({ schema: 'org.cinnamon' });
-            this._settings.connect('changed', Lang.bind(this, this._onSettingsChanged));
+            this._settings.connect('changed::panel-launchers', Lang.bind(this, this._onSettingsChanged));
             
             this._addLauncherDialog = new AddLauncherDialog();
             this._addLauncherDialog.connect("launcher-created", Lang.bind(this, this._onLauncherCreated));
@@ -439,7 +467,6 @@ MyApplet.prototype = {
             desktopFiles.splice(i, 1);
             desktopFiles.splice(i, 0, appid);
             this._settings.set_strv('panel-launchers', desktopFiles);
-            this.reload();
         }
     },
     
@@ -448,7 +475,6 @@ MyApplet.prototype = {
             let desktopFiles = this._settings.get_strv('panel-launchers');
             desktopFiles.push(appid);
             this._settings.set_strv('panel-launchers', desktopFiles);
-            this.reload();
         }
     },
     

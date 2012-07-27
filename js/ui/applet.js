@@ -9,6 +9,7 @@ const Clutter = imports.gi.Clutter;
 const AppletManager = imports.ui.appletManager;
 const Gtk = imports.gi.Gtk;
 const Util = imports.misc.util;
+const Pango = imports.gi.Pango;
 
 function MenuItem(label, icon, callback) {
     this._init(label, icon, callback);
@@ -88,6 +89,7 @@ Applet.prototype = {
         this._panelLocation = null; // Backlink to the panel location our applet is in, set by Cinnamon.
         this._newPanelLocation = null; //  Used when moving an applet
         this._uuid = null; // Defined in gsettings, set by Cinnamon.
+        this._hook = null; // Defined in metadata.json, set by appletManager
         this._dragging = false;                
         this._draggable = DND.makeDraggable(this.actor);
         this._draggable.connect('drag-begin', Lang.bind(this, this._onDragBegin));
@@ -179,21 +181,10 @@ Applet.prototype = {
         if (this._applet_context_menu._getMenuItems().length > 0) {
             this._applet_context_menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         }
-        let context_menu_item_remove = new MenuItem(_("Remove from Panel"), Gtk.STOCK_REMOVE, Lang.bind(null, AppletManager._removeAppletFromPanel, this._uuid));
-        this._applet_context_menu.addMenuItem(context_menu_item_remove);
-        let panel_settings_item = new MenuItem(_("Panel settings"), null, Lang.bind(this, this._PanelSettings));
-        this._applet_context_menu.addMenuItem(panel_settings_item);
-        let applet_settings_item = new MenuItem(_("Add/remove applets"), null, Lang.bind(this, this._AppletSettings));
-        this._applet_context_menu.addMenuItem(applet_settings_item);
+        let context_menu_item_remove = new MenuItem(_("Remove this applet"), Gtk.STOCK_REMOVE, Lang.bind(null, AppletManager._removeAppletFromPanel, this._uuid));
+        this._applet_context_menu.addMenuItem(context_menu_item_remove);        
     },
-
-    _PanelSettings: function(actor, event) {
-        Util.spawnCommandLine("cinnamon-settings panel");
-    },
-
-    _AppletSettings: function(actor, event) {
-        Util.spawnCommandLine("cinnamon-settings applets");
-    }
+   
 };
 
 function IconApplet(orientation) {
@@ -225,7 +216,7 @@ IconApplet.prototype = {
         if (icon_path){
             let file = Gio.file_new_for_path(icon_path);
             let icon_uri = file.get_uri();
-            this._applet_icon = St.TextureCache.get_default().load_uri_sync(1, icon_uri, 22, 22);
+            this._applet_icon = St.TextureCache.get_default().load_uri_async(icon_uri, 22, 22);
             this._applet_icon_box.child = this._applet_icon;
         }
     },
@@ -240,7 +231,8 @@ TextApplet.prototype = {
 
     _init: function(orientation) {
         Applet.prototype._init.call(this, orientation);        
-        this._applet_label = new St.Label({ reactive: true, track_hover: true, style_class: 'applet-label'});        
+        this._applet_label = new St.Label({ reactive: true, track_hover: true, style_class: 'applet-label'});       
+        this._applet_label.clutter_text.ellipsize = Pango.EllipsizeMode.NONE; 
         this.actor.add(this._applet_label, { y_align: St.Align.MIDDLE, y_fill: false });    
     },
 
@@ -249,8 +241,7 @@ TextApplet.prototype = {
     },
     
     on_applet_added_to_panel: function() {       
-        let [labelMinWidth, labelNaturalWidth] = this._applet_label.get_preferred_width(-1);
-        this._applet_label.style = ('min-width: ' +  labelNaturalWidth + 'px;');                               
+                        
     }
 };
 
@@ -263,7 +254,8 @@ TextIconApplet.prototype = {
 
     _init: function(orientation) {
         IconApplet.prototype._init.call(this, orientation);
-        this._applet_label = new St.Label({ reactive: true, track_hover: true, style_class: 'applet-label'});        
+        this._applet_label = new St.Label({ reactive: true, track_hover: true, style_class: 'applet-label'});    
+        this._applet_label.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;     
         this.actor.add(this._applet_label, { y_align: St.Align.MIDDLE, y_fill: false });
     },
 
@@ -276,7 +268,6 @@ TextIconApplet.prototype = {
     },
     
     on_applet_added_to_panel: function() {       
-        let [labelMinWidth, labelNaturalWidth] = this._applet_label.get_preferred_width(-1);
-        this._applet_label.style = ('min-width: ' +  labelNaturalWidth + 'px;');                               
+                                
     }  
 };

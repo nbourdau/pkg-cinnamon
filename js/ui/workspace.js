@@ -1,7 +1,7 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 
 const Clutter = imports.gi.Clutter;
-const GConf = imports.gi.GConf;
+const Gio = imports.gi.Gio;
 const Lang = imports.lang;
 const Mainloop = imports.mainloop;
 const Meta = imports.gi.Meta;
@@ -27,7 +27,8 @@ const CLOSE_BUTTON_FADE_TIME = 0.1;
 
 const DRAGGING_WINDOW_OPACITY = 100;
 
-const BUTTON_LAYOUT_KEY = '/desktop/cinnamon/windows/button_layout';
+const BUTTON_LAYOUT_SCHEMA = 'org.cinnamon.overrides';
+const BUTTON_LAYOUT_KEY = 'button-layout';
 
 // Define a layout scheme for small window counts. For larger
 // counts we fall back to an algorithm. We need more schemes here
@@ -39,7 +40,7 @@ const POSITIONS = {
         1: [[0.5, 0.5, 0.95]],
         2: [[0.25, 0.5, 0.48], [0.75, 0.5, 0.48]],
         3: [[0.25, 0.25, 0.48],  [0.75, 0.25, 0.48],  [0.5, 0.75, 0.48]],
-        4: [[0.25, 0.25, 0.47],   [0.75, 0.25, 0.47], [0.75, 0.75, 0.47], [0.25, 0.75, 0.47]],
+        4: [[0.25, 0.25, 0.47],   [0.75, 0.25, 0.47], [0.25, 0.75, 0.47], [0.75, 0.75, 0.47]],
         5: [[0.165, 0.25, 0.32], [0.495, 0.25, 0.32], [0.825, 0.25, 0.32], [0.25, 0.75, 0.32], [0.75, 0.75, 0.32]]
 };
 // Used in _orderWindowsPermutations, 5! = 120 which is probably the highest we can go
@@ -136,11 +137,11 @@ WindowClone.prototype = {
         this._realWindowDestroyId = this.realWindow.connect('destroy',
             Lang.bind(this, this._disconnectRealWindowSignals));
 
-        let clickAction = new Clutter.ClickAction();
-        clickAction.connect('clicked', Lang.bind(this, this._onClicked));
-        clickAction.connect('long-press', Lang.bind(this, this._onLongPress));
+        //let clickAction = new Clutter.ClickAction();
+        this.actor.connect('button-release-event', Lang.bind(this, this._onButtonRelease));
+        //clickAction.connect('long-press', Lang.bind(this, this._onLongPress));
 
-        this.actor.add_action(clickAction);
+        //this.actor.add_action(clickAction);
 
         this.actor.connect('scroll-event',
                            Lang.bind(this, this._onScroll));
@@ -346,9 +347,15 @@ WindowClone.prototype = {
         this._zoomStep           = undefined;
     },
 
-    _onClicked: function(action, actor) {
-        this._selected = true;
-        this.emit('selected', global.get_current_time());
+    _onButtonRelease: function(actor, event) {
+        if ( event.get_button()==1 ) {
+            this._selected = true;
+            this.emit('selected', global.get_current_time());
+        }
+        if (event.get_button()==2){
+            this.emit('closed', global.get_current_time());
+        }
+        return true;
     },
 
     _onLongPress: function(action, actor, state) {
@@ -447,7 +454,7 @@ WindowOverlay.prototype = {
             icon = app.create_icon_texture(WINDOWOVERLAY_ICON_SIZE);
         }
         if (!icon) {
-            icon = new St.Icon({ icon_name: 'applications-other',
+            icon = new St.Icon({ icon_name: 'application-default-icon',
                                  icon_type: St.IconType.FULLCOLOR,
                                  icon_size: WINDOWOVERLAY_ICON_SIZE });
         }
@@ -467,7 +474,7 @@ WindowOverlay.prototype = {
         button._overlap = 0;
 
         this._idleToggleCloseId = 0;
-        button.connect('clicked', Lang.bind(this, this._closeWindow));
+        button.connect('clicked', Lang.bind(this, this.closeWindow));
 
         windowClone.actor.connect('destroy', Lang.bind(this, this._onDestroy));
         windowClone.actor.connect('enter-event',
@@ -497,6 +504,13 @@ WindowOverlay.prototype = {
         // the signal will be emitted normally when we are added
         if (parentActor.get_stage())
             this._onStyleChanged();
+    },
+
+    setSelected: function(selected) {
+        this.title.name = selected ? 'selected' : '';
+        if (selected) {
+            this._onEnter();
+        }
     },
 
     hide: function() {
@@ -547,8 +561,8 @@ WindowOverlay.prototype = {
         let button = this.closeButton;
         let title = this.title;
 
-        let gconf = GConf.Client.get_default();
-        let layout = gconf.get_string(BUTTON_LAYOUT_KEY);
+        let settings = new Gio.Settings({ schema: BUTTON_LAYOUT_SCHEMA });
+        let layout = settings.get_string(BUTTON_LAYOUT_KEY);
         let rtl = St.Widget.get_default_direction() == St.TextDirection.RTL;
 
         let split = layout.split(":");
@@ -583,7 +597,7 @@ WindowOverlay.prototype = {
         icon.set_position(Math.floor(iconX), Math.floor(iconY));
     },
 
-    _closeWindow: function(actor) {
+    closeWindow: function() {
         let metaWindow = this._windowClone.metaWindow;
         this._workspace = metaWindow.get_workspace();
 
@@ -712,15 +726,16 @@ Workspace.prototype = {
 
         this.actor.connect('destroy', Lang.bind(this, this._onDestroy));
 
-        let windows = global.get_window_actors().filter(this._isMyWindow, this);
+        let windows = Main.getTabList(this.metaWorkspace);
 
         // Create clones for windows that should be
         // visible in the Overview
         this._windows = [];
         this._windowOverlays = [];
         for (let i = 0; i < windows.length; i++) {
-            if (this._isOverviewWindow(windows[i])) {
-                this._addWindowClone(windows[i]);
+            let window = windows[i].get_compositor_private();
+            if (this._isOverviewWindow(window)) {
+                this._addWindowClone(window);
             }
         }
 
@@ -738,6 +753,86 @@ Workspace.prototype = {
         this._repositionWindowsId = 0;
 
         this.leavingOverview = false;
+
+        this._kbWindowIndex = -1; // index of the current keyboard-selected window
+    },
+    
+    selectAnotherWindow: function(symbol) {
+        let numWindows = this._windowOverlays.length;
+        if (numWindows === 0) {
+            return;
+        }
+        if (this._kbWindowIndex > -1 && this._kbWindowIndex < numWindows) {
+            this._windowOverlays[this._kbWindowIndex].setSelected(false);
+        }
+
+        if (numWindows > 3 // grid navigation is not suited for a low window count
+            && (symbol === Clutter.Down || symbol === Clutter.Up))
+        {
+            let numCols = Math.ceil(Math.sqrt(numWindows));
+            let numRows = Math.ceil(numWindows/numCols);
+
+            let curRow = Math.floor(this._kbWindowIndex/numCols);
+            let curCol = this._kbWindowIndex % numCols;
+
+            let calcNewIndex = function(rowDelta) {
+                let newIndex = (curRow + rowDelta) * numCols + curCol;
+                if (rowDelta >= 0) { // down
+                    return newIndex < numWindows ?
+                        newIndex :
+                        curCol < numCols - 1 ?
+                    // wrap to top row, one column to the right:
+                            curCol + 1 : 
+                    // wrap to top row, left-most column:
+                            0;
+                }
+                else { // up
+                    let numFullRows = Math.floor(numWindows/numCols);
+                    let numWOILR = numWindows % numCols; //num Windows on Incompl. Last Row
+                    return newIndex >= 0 ?
+                        newIndex :
+                        curCol === 0 ?
+                   // Wrap to the bottom of the right-most column, may not be on last row:
+                            (numFullRows * numCols) - 1 :
+                    /* If we're on the 
+                    top row but not in the first column, we want to move to the bottom of the
+                    column to the left, even though that may not be the bottom of the grid.
+                    */
+                            numWOILR && curCol > numWOILR ?
+                                ((numFullRows - 1) * numCols) + curCol - 1:
+                                ((numRows - 1) * numCols) + curCol - 1;
+                }
+            };
+
+            if (symbol === Clutter.Down) {
+                this._kbWindowIndex = calcNewIndex(1);
+            }
+            if (symbol === Clutter.Up) {
+                this._kbWindowIndex = calcNewIndex(-1);
+            }
+        }
+        else if (symbol === Clutter.Left || symbol === Clutter.Up) {
+            this._kbWindowIndex = (this._kbWindowIndex < 1 ? numWindows : this._kbWindowIndex) - 1;
+        }
+        else if (symbol === Clutter.Right || symbol === Clutter.Down) {
+            this._kbWindowIndex = (this._kbWindowIndex + 1) % numWindows;
+        }
+
+        this._windowOverlays[this._kbWindowIndex].setSelected(true);
+    },
+    
+    activateSelectedWindow: function() {
+        if (this._kbWindowIndex > -1 && this._kbWindowIndex < this._windows.length) {
+            this._onCloneSelected(this._windows[this._kbWindowIndex], global.get_current_time());
+            return true;
+        }
+        return false;
+    },
+
+    closeSelectedWindow: function() {
+        if (this._kbWindowIndex > -1 && this._kbWindowIndex < this._windowOverlays.length) {
+            this._windowOverlays[this._kbWindowIndex].closeWindow();
+        }
     },
 
     setGeometry: function(x, y, width, height) {
@@ -771,7 +866,7 @@ Workspace.prototype = {
     },
 
     isEmpty: function() {
-        return this._windows.length == 0;
+        return this._windows.length === 0;
     },
 
     // Only use this for n <= 20 say
@@ -1032,7 +1127,7 @@ Workspace.prototype = {
 
         // Start the animations
         let slots = this._computeAllWindowSlots(clones.length);
-        clones = this._orderWindowsByMotionAndStartup(clones, slots);
+        //clones = this._orderWindowsByMotionAndStartup(clones, slots);
 
         let currentWorkspace = global.screen.get_active_workspace();
         let isOnCurrentWorkspace = this.metaWorkspace == null || this.metaWorkspace == currentWorkspace;
@@ -1209,6 +1304,15 @@ Workspace.prototype = {
                 scale: stageWidth / clone.actor.width
             };
         }
+        if (index === this._kbWindowIndex) {
+            if (this._kbWindowIndex >= this._windowOverlays.length) {
+                this._kbWindowIndex = 0;
+            }
+            if (this._kbWindowIndex < this._windowOverlays.length) {
+                this._windowOverlays[this._kbWindowIndex].setSelected(true);
+            }
+        }
+        
         clone.destroy();
 
 
@@ -1413,8 +1517,7 @@ Workspace.prototype = {
 
     // Tests if @win should be shown in the Overview
     _isOverviewWindow : function (win) {
-        let tracker = Cinnamon.WindowTracker.get_default();
-        return tracker.is_window_interesting(win.get_meta_window());
+        return true;
     },
 
     // Create a clone of a (non-desktop) window and add it to the window list
@@ -1424,6 +1527,8 @@ Workspace.prototype = {
 
         clone.connect('selected',
                       Lang.bind(this, this._onCloneSelected));
+        clone.connect('closed',
+                      Lang.bind(this, this._onCloneClosed));
         clone.connect('drag-begin',
                       Lang.bind(this, function(clone) {
                           Main.overview.beginWindowDrag();
@@ -1500,6 +1605,10 @@ Workspace.prototype = {
         if (this.metaWorkspace)
             wsIndex = this.metaWorkspace.index();
         Main.activateWindow(clone.metaWindow, time, wsIndex);
+    },
+    
+    _onCloneClosed : function (clone, time) {        
+        clone.metaWindow.delete(global.get_current_time());        
     },
 
     // Draggable target interface

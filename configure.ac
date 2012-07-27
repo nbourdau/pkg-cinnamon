@@ -1,5 +1,5 @@
 AC_PREREQ(2.63)
-AC_INIT([cinnamon],[1.4.0],[https://bugzilla.gnome.org/enter_bug.cgi?product=cinnamon],[cinnamon])
+AC_INIT([cinnamon],[1.5.2],[https://bugzilla.gnome.org/enter_bug.cgi?product=cinnamon],[cinnamon])
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_SRCDIR([src/cinnamon-global.c])
@@ -36,10 +36,6 @@ AC_DEFINE_UNQUOTED(GETTEXT_PACKAGE, "$GETTEXT_PACKAGE",
 
 PKG_PROG_PKG_CONFIG([0.22])
 
-# GConf stuff
-AC_PATH_PROG(GCONFTOOL, gconftool-2, no)
-AM_GCONF_SOURCE_2
-
 GLIB_GSETTINGS
 
 # Get a value to substitute into cinnamon.in
@@ -67,15 +63,9 @@ AM_CONDITIONAL(BUILD_RECORDER, $build_recorder)
 CLUTTER_MIN_VERSION=1.7.5
 GOBJECT_INTROSPECTION_MIN_VERSION=0.10.1
 GJS_MIN_VERSION=1.29.18
-MUFFIN_MIN_VERSION=1.0.2
-FOLKS_MIN_VERSION=0.5.2
+MUFFIN_MIN_VERSION=1.0.5
 GTK_MIN_VERSION=3.0.0
 GIO_MIN_VERSION=2.29.10
-LIBECAL_MIN_VERSION=2.32.0
-LIBEDATASERVER_MIN_VERSION=1.2.0
-LIBEDATASERVERUI_MIN_VERSION=2.91.6
-TELEPATHY_GLIB_MIN_VERSION=0.15.5
-TELEPATHY_LOGGER_MIN_VERSION=0.2.4
 POLKIT_MIN_VERSION=0.100
 STARTUP_NOTIFICATION_MIN_VERSION=0.11
 
@@ -83,7 +73,6 @@ STARTUP_NOTIFICATION_MIN_VERSION=0.11
 PKG_CHECK_MODULES(CINNAMON, gio-2.0 >= $GIO_MIN_VERSION
                                gio-unix-2.0 dbus-glib-1 libxml-2.0
                                gtk+-3.0 >= $GTK_MIN_VERSION
-                               folks >= $FOLKS_MIN_VERSION
                                libmuffin >= $MUFFIN_MIN_VERSION
                                gjs-internals-1.0 >= $GJS_MIN_VERSION
 			       libgnome-menu-3.0 $recorder_modules gconf-2.0
@@ -92,8 +81,6 @@ PKG_CHECK_MODULES(CINNAMON, gio-2.0 >= $GIO_MIN_VERSION
                                libstartup-notification-1.0 >= $STARTUP_NOTIFICATION_MIN_VERSION
                                gobject-introspection-1.0 >= $GOBJECT_INTROSPECTION_MIN_VERSION
 			       libcanberra
-                               telepathy-glib >= $TELEPATHY_GLIB_MIN_VERSION
-                               telepathy-logger-0.2 >= $TELEPATHY_LOGGER_MIN_VERSION
                                polkit-agent-1 >= $POLKIT_MIN_VERSION xfixes
                                libnm-glib libnm-util gnome-keyring-1)
 
@@ -130,6 +117,7 @@ PKG_CHECK_EXISTS([gnome-bluetooth-1.0 >= 3.1.0],
         [BLUETOOTH_DIR=`$PKG_CONFIG --variable=applet_libdir gnome-bluetooth-1.0`
 	 BLUETOOTH_LIBS=`$PKG_CONFIG --variable=applet_libs gnome-bluetooth-1.0`
 	 AC_SUBST([BLUETOOTH_LIBS],["$BLUETOOTH_LIBS"])
+	 AC_SUBST([BLUETOOTH_DIR],["$BLUETOOTH_DIR"])
 	 AC_DEFINE_UNQUOTED([BLUETOOTH_DIR],["$BLUETOOTH_DIR"],[Path to installed GnomeBluetooth typelib and library])
 	 AC_DEFINE([HAVE_BLUETOOTH],[1],[Define if you have libgnome-bluetooth-applet])
 	 AC_SUBST([HAVE_BLUETOOTH],[1])
@@ -137,10 +125,6 @@ PKG_CHECK_EXISTS([gnome-bluetooth-1.0 >= 3.1.0],
 	[AC_DEFINE([HAVE_BLUETOOTH],[0])
 	 AC_SUBST([HAVE_BLUETOOTH],[0])
 	 AC_MSG_RESULT([no])])
-
-PKG_CHECK_MODULES(CALENDAR_SERVER, libecal-1.2 >= $LIBECAL_MIN_VERSION libedataserver-1.2 >= $LIBEDATASERVER_MIN_VERSION libedataserverui-3.0 >= $LIBEDATASERVERUI_MIN_VERSION gio-2.0)
-AC_SUBST(CALENDAR_SERVER_CFLAGS)
-AC_SUBST(CALENDAR_SERVER_LIBS)
 
 MUFFIN_GIR_DIR=`$PKG_CONFIG --variable=girdir libmuffin`
 MUFFIN_TYPELIB_DIR=`$PKG_CONFIG --variable=typelibdir libmuffin`

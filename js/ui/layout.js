@@ -10,6 +10,7 @@ const Main = imports.ui.main;
 const Params = imports.misc.params;
 const ScreenSaver = imports.misc.screenSaver;
 const Tweener = imports.ui.tweener;
+const EdgeFlip = imports.ui.edgeFlip;
 
 const HOT_CORNER_ACTIVATION_TIMEOUT = 0.5;
 const STARTUP_ANIMATION_TIME = 0.2;
@@ -30,39 +31,34 @@ LayoutManager.prototype = {
         this._rightPanelBarrier = 0;
         this._leftPanelBarrier2 = 0;
         this._rightPanelBarrier2 = 0;
-        this._trayBarrier = 0;		
-        this._chrome = new Chrome(this);       
-		
-		this._hotCorner = new HotCorner();        
-		this.overviewCorner = new St.Button({name: 'overview-corner', reactive: true, track_hover: true });		
-		this.addChrome(this.overviewCorner, { visibleInFullscreen: false });	
-		this.overviewCorner.connect('button-release-event', Lang.bind(this, this._toggleExpo));
-		
-        this.trayBox = new St.BoxLayout({ name: 'trayBox' }); 
-        this.addChrome(this.trayBox, { visibleInFullscreen: true });
-        this.trayBox.connect('allocation-changed',
-                             Lang.bind(this, this._updateTrayBarrier));
-                             
+        this.edgeRight = null;
+        this.edgeLeft = null;
+        this._chrome = new Chrome(this);
+
+        this._hotCorner = new HotCorner();        
+        this.overviewCorner = new St.Button({name: 'overview-corner', reactive: true, track_hover: true });
+        this.addChrome(this.overviewCorner, { visibleInFullscreen: false });        
+        this.overviewCorner.connect('button-release-event', Lang.bind(this, this._toggleExpo));
+                
         this.panelBox = new St.BoxLayout({ name: 'panelBox',
                                            vertical: true });
-                                           
+
         this.panelBox2 = new St.BoxLayout({ name: 'panelBox',
-                                           vertical: true });                                           
+                                            vertical: true });                                           
         
-		let autohide = global.settings.get_boolean("panel-autohide");
-//        this._chrome.addActor(this.panelBox);
-		if (autohide) {
-        	this.addChrome(this.panelBox, { affectsStruts: false, addToWindowgroup: false });
+        let autohide = global.settings.get_boolean("panel-autohide");
+        if (autohide) {
+            this.addChrome(this.panelBox, { affectsStruts: false, addToWindowgroup: false });
             this.addChrome(this.panelBox2, { affectsStruts: false, addToWindowgroup: false });
-		}
-		else {
-			this.addChrome(this.panelBox, { affectsStruts: true, addToWindowgroup: false });
+        }
+        else {
+            this.addChrome(this.panelBox, { affectsStruts: true, addToWindowgroup: false });
             this.addChrome(this.panelBox2, { affectsStruts: true, addToWindowgroup: false });
-		}
+        }
         this.panelBox.connect('allocation-changed',
                               Lang.bind(this, this._updatePanelBarriers));
         this.panelBox2.connect('allocation-changed',
-                              Lang.bind(this, this._updatePanelBarriers));
+                               Lang.bind(this, this._updatePanelBarriers));
 
         this.keyboardBox = new St.BoxLayout({ name: 'keyboardBox',
                                               reactive: true,
@@ -73,33 +69,28 @@ LayoutManager.prototype = {
         global.screen.connect('monitors-changed',
                               Lang.bind(this, this._monitorsChanged));
         global.window_manager.connect('switch-workspace',
-                              Lang.bind(this, this._windowsRestacked));
+                                      Lang.bind(this, this._windowsRestacked));
         this._monitorsChanged();
         this._chrome.addActor(this._hotCorner.actor);
+        this.enabledEdgeFlip = global.settings.get_boolean("enable-edge-flip");
+        global.settings.connect("changed::enable-edge-flip", Lang.bind(this, this._onEnableEdgeFlipChanged));
         global.settings.connect("changed::panel-autohide", Lang.bind(this, this._onPanelAutoHideChanged));
         global.settings.connect("changed::overview-corner-visible", Lang.bind(this, this._onOverviewCornerVisibleChanged));
         global.settings.connect("changed::overview-corner-hover", Lang.bind(this, this._onOverviewCornerHoverChanged));
         global.settings.connect("changed::overview-corner-position", Lang.bind(this, this._updateBoxes));
-        
+
         global.screen.connect('restacked',
                               Lang.bind(this, this._windowsRestacked));
+
     },
-    
+
+    _onEnableEdgeFlipChanged: function(){
+        this.enableEdgeFlip = global.settings.get_boolean("enable-edge-flip");
+        this.edgeRight.enabled = this.enabledEdgeFlip;
+        this.edgeLeft.enabled = this.enabledEdgeFlip;
+    },
+
     _windowsRestacked: function() {
-        /*let windows = global.window_group.get_children();
-        //let hasCoveringWindows = false;
-        for (var i in windows){
-            if (windows[i] instanceof Meta.WindowActor){
-                if (windows[i].get_meta_window().get_layer() <= Meta.StackLayer.NORMAL){
-                    this.panelBox.raise(windows[i]);
-                    this.panelBox2.raise(windows[i]);
-                }//else hasCoveringWindows = true;
-            }
-        }*/
-        /*// Hack to have context menus items active when they're over the panel
-        this._chrome.modifyActorParams(this.panelBox, { affectsInputRegion: !hasCoveringWindows });
-        this._chrome.modifyActorParams(this.panelBox2, { affectsInputRegion: !hasCoveringWindows });*/
-        
         this._chrome.updateRegions();
     },
 
@@ -110,44 +101,51 @@ LayoutManager.prototype = {
         this._chrome.init();
 
         this._startupAnimation();
+        this.edgeRight = new EdgeFlip.EdgeFlipper(St.Side.RIGHT, Main.wm.actionMoveWorkspaceRight);
+        this.edgeLeft = new EdgeFlip.EdgeFlipper(St.Side.LEFT, Main.wm.actionMoveWorkspaceLeft);
+
+        this.edgeRight.enabled = this.enabledEdgeFlip;
+        this.edgeLeft.enabled = this.enabledEdgeFlip;
     },
     
     _toggleExpo: function() {
-        if (!Main.expo.animationInProgress) {            
-        	Main.expo.toggle();
-        }                    
+        if (!Main.expo.animationInProgress) {
+            if (Main.overview.visible) {
+                this._activationTime = Date.now() / 1000;
+                Main.overview.hide();
+                Main.expo.toggle();
+            } else {
+                Main.expo.toggle();
+            }
+        }
     },
     
-    _onPanelAutoHideChanged: function() {    	
+    _onPanelAutoHideChanged: function() {            
         let autohide = global.settings.get_boolean("panel-autohide");
-		if (autohide) {
-        	this._chrome.modifyActorParams(this.panelBox, { affectsStruts: false });
+        if (autohide) {
+            this._chrome.modifyActorParams(this.panelBox, { affectsStruts: false });
             this._chrome.modifyActorParams(this.panelBox2, { affectsStruts: false });
-		}
-		else {
-			this._chrome.modifyActorParams(this.panelBox, { affectsStruts: true });
+        }
+        else {
+            this._chrome.modifyActorParams(this.panelBox, { affectsStruts: true });
             this._chrome.modifyActorParams(this.panelBox2, { affectsStruts: true });
-		}
+        }
     },
     
-     _onOverviewCornerVisibleChanged: function() {    	
+    _onOverviewCornerVisibleChanged: function() {            
         let visible = global.settings.get_boolean("overview-corner-visible");
-		if (visible) {
-        	this.overviewCorner.show();
-		}
-		else {
-			this.overviewCorner.hide();
-		}
+        if (visible)
+            this.overviewCorner.show();
+        else
+            this.overviewCorner.hide();
     },
     
-     _onOverviewCornerHoverChanged: function() {    	
+    _onOverviewCornerHoverChanged: function() {            
         let enabled = global.settings.get_boolean("overview-corner-hover");
-		if (enabled) {
-        	this._hotCorner.actor.show();
-		}
-		else {
-			this._hotCorner.actor.hide();
-		}
+        if (enabled)
+            this._hotCorner.actor.show();
+        else
+            this._hotCorner.actor.hide();
     },
 
     _updateMonitors: function() {
@@ -222,7 +220,7 @@ LayoutManager.prototype = {
 
             if (!haveTopLeftCorner)
                 continue;
-            
+
             let _hotCorner = new HotCorner();            
             this._hotCorners.push(_hotCorner);
             _hotCorner.actor.set_position(cornerX, cornerY);
@@ -230,68 +228,61 @@ LayoutManager.prototype = {
         }
     },
 
-    _updateBoxes: function() {    	    
-    	let hotCornerPosition = global.settings.get_string("overview-corner-position");
-    	if (hotCornerPosition == "topLeft") {
-			this._hotCorner.actor.set_position(this.primaryMonitor.x,this.primaryMonitor.y);    	
-			this.overviewCorner.set_position(this.primaryMonitor.x + 1, this.primaryMonitor.y + 1);
-		} else if (hotCornerPosition == "topRight") {
-			this._hotCorner.actor.set_position(this.primaryMonitor.width - 1,this.primaryMonitor.y);    	
-			this.overviewCorner.set_position(this.primaryMonitor.width - 33, this.primaryMonitor.y + 1);
-		} else if (hotCornerPosition == "bottomLeft") {
-			this._hotCorner.actor.set_position(this.primaryMonitor.x,this.primaryMonitor.height - 1);    	
-			this.overviewCorner.set_position(this.primaryMonitor.x + 1, this.primaryMonitor.height - 33);
-		} else if (hotCornerPosition == "bottomRight") {
-			this._hotCorner.actor.set_position(this.primaryMonitor.width - 1,this.primaryMonitor.height - 1);
-			this.overviewCorner.set_position(this.primaryMonitor.width - 33, this.primaryMonitor.height - 33);
-		}
-    	
-    	this.overviewCorner.set_size(32, 32);
-    	
-    	if (global.settings.get_boolean("overview-corner-hover")) {
-			this._hotCorner.actor.show();
-		}
-		else {
-			this._hotCorner.actor.hide();
-		}
-    	
-    	if (global.settings.get_boolean("overview-corner-visible")) {
-			this.overviewCorner.show();
-		}
-		else {
-			this.overviewCorner.hide();
-		}
-    	
+    _updateBoxes: function() {                
+        let hotCornerPosition = global.settings.get_string("overview-corner-position");
+        if (hotCornerPosition == "topLeft") {
+            this._hotCorner.actor.set_position(this.primaryMonitor.x,this.primaryMonitor.y);            
+            this.overviewCorner.set_position(this.primaryMonitor.x + 1, this.primaryMonitor.y + 1);
+        } else if (hotCornerPosition == "topRight") {
+            this._hotCorner.actor.set_position(this.primaryMonitor.width - 1,this.primaryMonitor.y);            
+            this.overviewCorner.set_position(this.primaryMonitor.width - 33, this.primaryMonitor.y + 1);
+        } else if (hotCornerPosition == "bottomLeft") {
+            this._hotCorner.actor.set_position(this.primaryMonitor.x,this.primaryMonitor.height - 1);            
+            this.overviewCorner.set_position(this.primaryMonitor.x + 1, this.primaryMonitor.height - 33);
+        } else if (hotCornerPosition == "bottomRight") {
+            this._hotCorner.actor.set_position(this.primaryMonitor.width - 1,this.primaryMonitor.height - 1);
+            this.overviewCorner.set_position(this.primaryMonitor.width - 33, this.primaryMonitor.height - 33);
+        }
+
+        this.overviewCorner.set_size(32, 32);
+
+        if (global.settings.get_boolean("overview-corner-hover"))
+            this._hotCorner.actor.show();
+        else
+            this._hotCorner.actor.hide();
+            
+        if (global.settings.get_boolean("overview-corner-visible"))
+            this.overviewCorner.show();
+        else
+            this.overviewCorner.hide();
+            
         // Need to use GSettings to get the panel height instead of hard-coding it
         if (Main.desktop_layout == Main.LAYOUT_TRADITIONAL) {       
-            this.panelBox.set_position(this.bottomMonitor.x, this.bottomMonitor.y + this.bottomMonitor.height - 25);
-            this.panelBox.set_size(this.bottomMonitor.width, 25);
+            let panelHeight = 25;
+            if (Main.panel) {
+                panelHeight = Main.panel.actor.get_height();
+            }
+            this.panelBox.set_position(this.bottomMonitor.x, this.bottomMonitor.y + this.bottomMonitor.height - panelHeight);
+            this.panelBox.set_size(this.bottomMonitor.width, panelHeight);
         }
         else if (Main.desktop_layout == Main.LAYOUT_FLIPPED) {         
             this.panelBox.set_position(this.primaryMonitor.x, this.primaryMonitor.y);
             this.panelBox.set_size(this.primaryMonitor.width, -1);            
         }
         else if (Main.desktop_layout == Main.LAYOUT_CLASSIC) { 
+            let panelHeight = 25;
+            if (Main.panel2) {
+                panelHeight = Main.panel2.actor.get_height();
+            }
             this.panelBox.set_position(this.primaryMonitor.x, this.primaryMonitor.y);
             this.panelBox.set_size(this.primaryMonitor.width, -1);       
-            this.panelBox2.set_position(this.bottomMonitor.x, this.bottomMonitor.y + this.bottomMonitor.height - 25);
-            this.panelBox2.set_size(this.bottomMonitor.width, 25);       
+            this.panelBox2.set_position(this.bottomMonitor.x, this.bottomMonitor.y + this.bottomMonitor.height - panelHeight);
+            this.panelBox2.set_size(this.bottomMonitor.width, panelHeight);       
         }
-
+        
         this.keyboardBox.set_position(this.bottomMonitor.x,
                                       this.bottomMonitor.y + this.bottomMonitor.height);
         this.keyboardBox.set_size(this.bottomMonitor.width, -1);
-
-        this.trayBox.set_position(this.primaryMonitor.x,
-                                  this.primaryMonitor.y + 25);
-        this.trayBox.set_size(this.primaryMonitor.width, -1);
-
-        // Set trayBox's clip to show things above it, but not below
-        // it (so it's not visible behind the keyboard). The exact
-        // height of the clip doesn't matter, as long as it's taller
-        // than any Notification.actor.
-        this.trayBox.set_clip(0, -this.bottomMonitor.height,
-                              this.bottomMonitor.width, this.bottomMonitor.height);
     },
 
     _updatePanelBarriers: function(panelBox) {
@@ -312,27 +303,21 @@ LayoutManager.prototype = {
         if (panelBox.height) {                        
             if ((Main.desktop_layout == Main.LAYOUT_TRADITIONAL && panelBox==this.panelBox) || (Main.desktop_layout == Main.LAYOUT_CLASSIC && panelBox==this.panelBox2)) {
                 let monitor = this.bottomMonitor;
-                leftPanelBarrier =
-                    global.create_pointer_barrier(monitor.x, monitor.y + monitor.height - panelBox.height,
-                                              monitor.x, monitor.y + monitor.height,
-                                              1 /* BarrierPositiveX */);
-                                            
-                rightPanelBarrier =
-                    global.create_pointer_barrier(monitor.x + monitor.width, monitor.y + monitor.height - panelBox.height,
-                                              monitor.x + monitor.width, monitor.y + monitor.height,
-                                              4 /* BarrierNegativeX */);
+                leftPanelBarrier = global.create_pointer_barrier(monitor.x, monitor.y + monitor.height - panelBox.height,
+                                                                 monitor.x, monitor.y + monitor.height,
+                                                                 1 /* BarrierPositiveX */);
+                rightPanelBarrier = global.create_pointer_barrier(monitor.x + monitor.width, monitor.y + monitor.height - panelBox.height,
+                                                                  monitor.x + monitor.width, monitor.y + monitor.height,
+                                                                  4 /* BarrierNegativeX */);
             }
             else {
                 let primary = this.primaryMonitor;
-                leftPanelBarrier =
-                    global.create_pointer_barrier(primary.x, primary.y,
--                                              primary.x, primary.y + panelBox.height, 
-                                              1 /* BarrierPositiveX */);
-                                            
-                rightPanelBarrier =
-                    global.create_pointer_barrier(primary.x + primary.width, primary.y,
--                                              primary.x + primary.width, primary.y + panelBox.height, 
-                                              4 /* BarrierNegativeX */);
+                leftPanelBarrier = global.create_pointer_barrier(primary.x, primary.y,
+                                                                 -primary.x, primary.y + panelBox.height, 
+                                                                 1 /* BarrierPositiveX */);
+                rightPanelBarrier = global.create_pointer_barrier(primary.x + primary.width, primary.y,
+                                                                  -primary.x + primary.width, primary.y + panelBox.height, 
+                                                                  4 /* BarrierNegativeX */);
             }
         } else {
             leftPanelBarrier = 0;
@@ -347,27 +332,10 @@ LayoutManager.prototype = {
         }
     },
 
-    _updateTrayBarrier: function() {
-        let monitor = this.primaryMonitor;
-
-        if (this._trayBarrier)
-            global.destroy_pointer_barrier(this._trayBarrier);
-
-        //if (Main.messageTray && Main.messageTray.actor) {
-        //    this._trayBarrier =
-        //        global.create_pointer_barrier(monitor.x + monitor.width, monitor.y,
-        //                                      monitor.x + monitor.width, monitor.y + Main.messageTray.actor.height,
-        //                                      4 /* BarrierNegativeX */);
-        //} else {
-            this._trayBarrier = 0;
-        //}
-    },
-
     _monitorsChanged: function() {
         this._updateMonitors();
         this._updateBoxes();
         this._updateHotCorners();
-
         this.emit('monitors-changed');
     },
 
@@ -411,22 +379,25 @@ LayoutManager.prototype = {
         // Don't animate the strut
         this._chrome.freezeUpdateRegions();
 
-        this.panelBox.anchor_y = this.panelBox.height;
-        Tweener.addTween(this.panelBox,
-                         { anchor_y: 0,
-                           time: STARTUP_ANIMATION_TIME,
-                           transition: 'easeOutQuad',
-                           onComplete: this._startupAnimationComplete,
-                           onCompleteScope: this
-                         });
-        this.panelBox2.anchor_y = this.panelBox2.height;
-        Tweener.addTween(this.panelBox2,
-                         { anchor_y: 0,
-                           time: STARTUP_ANIMATION_TIME,
-                           transition: 'easeOutQuad',
-                           onComplete: this._startupAnimationComplete,
-                           onCompleteScope: this
-                         });
+        let params = { anchor_y: 0,
+                       time: STARTUP_ANIMATION_TIME,
+                       transition: 'easeOutQuad',
+                       onComplete: this._startupAnimationComplete,
+                       onCompleteScope: this
+                     };
+        
+        if (Main.desktop_layout == Main.LAYOUT_TRADITIONAL) {
+          this.panelBox.anchor_y  = -(this.panelBox.height);
+        }
+        else if (Main.desktop_layout == Main.LAYOUT_FLIPPED) {
+          this.panelBox.anchor_y  =   this.panelBox.height;
+        }
+        else if (Main.desktop_layout == Main.LAYOUT_CLASSIC) {
+          this.panelBox.anchor_y  =   this.panelBox.height;
+          this.panelBox2.anchor_y = -(this.panelBox2.height);
+        }
+        Tweener.addTween(this.panelBox, params);
+        Tweener.addTween(this.panelBox2, params);
     },
 
     _startupAnimationComplete: function() {
@@ -443,11 +414,6 @@ LayoutManager.prototype = {
                            onComplete: this._showKeyboardComplete,
                            onCompleteScope: this
                          });
-        Tweener.addTween(this.trayBox,
-                         { anchor_y: this.keyboardBox.height,
-                           time: KEYBOARD_ANIMATION_TIME,
-                           transition: 'easeOutQuad'
-                         });
     },
 
     _showKeyboardComplete: function() {
@@ -457,7 +423,6 @@ LayoutManager.prototype = {
 
         this._keyboardHeightNotifyId = this.keyboardBox.connect('notify::height', Lang.bind(this, function () {
             this.keyboardBox.anchor_y = this.keyboardBox.height;
-            this.trayBox.anchor_y = this.keyboardBox.height;
         }));
     },
 
@@ -473,11 +438,6 @@ LayoutManager.prototype = {
                            transition: 'easeOutQuad',
                            onComplete: this._hideKeyboardComplete,
                            onCompleteScope: this
-                         });
-        Tweener.addTween(this.trayBox,
-                         { anchor_y: 0,
-                           time: immediate ? 0 : KEYBOARD_ANIMATION_TIME,
-                           transition: 'easeOutQuad'
                          });
     },
 
@@ -603,14 +563,13 @@ HotCorner.prototype = {
                              Lang.bind(this, this._onCornerClicked));
         this._corner.connect('leave-event',
                              Lang.bind(this, this._onCornerLeft));
-                             
+
         this.cornerOpensExpo;
-        this.rippleActivated;
         
         this._updatePrefs();
         
         global.settings.connect("changed::overview-corner-position", Lang.bind(this, this._updatePrefs));
-	global.settings.connect("changed::overview-corner-functionality", Lang.bind(this, this._updatePrefs));
+        global.settings.connect("changed::overview-corner-functionality", Lang.bind(this, this._updatePrefs));
 
         // Cache the three ripples instead of dynamically creating and destroying them.
         this._ripple1 = new St.BoxLayout({ style_class: 'ripple-box', opacity: 0 });
@@ -627,8 +586,7 @@ HotCorner.prototype = {
     },
     
     _updatePrefs : function() {
-    	this.cornerOpensExpo = (global.settings.get_string("overview-corner-functionality") == "expo");
-        this.rippleActivated = (global.settings.get_string("overview-corner-position") == "topLeft");
+        this.cornerOpensExpo = (global.settings.get_string("overview-corner-functionality") == "expo");
     },
 
     _animRipple : function(ripple, delay, time, startScale, startOpacity, finalScale) {
@@ -641,9 +599,7 @@ HotCorner.prototype = {
 
         ripple._opacity = startOpacity;
 
-        if (ripple.get_direction() == St.TextDirection.RTL)
-            ripple.set_anchor_point_from_gravity(Clutter.Gravity.NORTH_EAST);
-
+        ripple.set_anchor_point_from_gravity(Clutter.Gravity.CENTER);
         ripple.visible = true;
         ripple.opacity = 255 * Math.sqrt(startOpacity);
         ripple.scale_x = ripple.scale_y = startScale;
@@ -678,9 +634,7 @@ HotCorner.prototype = {
             return;
 
         if (!Main.overview.visible && !Main.overview.animationInProgress && !Main.expo.visible) {
-            if (this.rippleActivated) {
-            	this.rippleAnimation();
-            }
+            this.rippleAnimation();
             Main.overview.showTemporarily();
             Main.overview.beginItemDrag(actor);
         }
@@ -691,21 +645,17 @@ HotCorner.prototype = {
             this._entered = true;
             if (!Main.expo.animationInProgress && !Main.overview.visible) {
                 this._activationTime = Date.now() / 1000;
-
-                if (this.rippleActivated) {
-                	this.rippleAnimation();
-                }
+                this.rippleAnimation();
                 if (this.cornerOpensExpo) {
-                	Main.expo.toggle();
+                    Main.expo.toggle();
+                } else if (!Main.overview.animationInProgress && !Main.expo.visible) {
+                    Main.overview.show();
                 } else {
-                	Main.overview.show();
+                    Main.expo.toggle();
                 }
             } else if (Main.overview.visible){
                 this._activationTime = Date.now() / 1000;
-
-                if (this.rippleActivated) {
-                	this.rippleAnimation();
-                }
+                this.rippleAnimation();
                 Main.overview.hide();
             }
         }
@@ -745,7 +695,6 @@ HotCorner.prototype = {
         return false;
     }
 };
-
 
 // This manages Cinnamon "chrome"; the UI that's visible in the
 // normal mode (ie, outside the Overview), that surrounds the main
@@ -796,9 +745,9 @@ Chrome.prototype = {
 
     init: function() {
         Main.overview.connect('showing',
-                             Lang.bind(this, this._overviewShowing));
+                              Lang.bind(this, this._overviewShowing));
         Main.overview.connect('hidden',
-                             Lang.bind(this, this._overviewHidden));
+                              Lang.bind(this, this._overviewHidden));
     },
 
     addActor: function(actor, params) {
@@ -841,7 +790,7 @@ Chrome.prototype = {
         if (i == -1)
             return;
         let actorData = this._trackedActors[i];
-        
+
         if (actorData.addToWindowgroup) global.window_group.remove_actor(actor);
         else Main.uiGroup.remove_actor(actor);
         this._untrackActor(actor);
@@ -1047,8 +996,8 @@ Chrome.prototype = {
                 // Check whether the window is screen sized
                 let isScreenSized =
                     (window.x == 0 && window.y == 0 &&
-                    window.width == global.screen_width &&
-                    window.height == global.screen_height);
+                     window.width == global.screen_width &&
+                     window.height == global.screen_height);
 
                 if (isScreenSized) {
                     for (let i = 0; i < this._monitors.length; i++)
@@ -1188,7 +1137,7 @@ Chrome.prototype = {
             let strut = new Meta.Strut({ rect: strutRect, side: side });
             struts.push(strut);
         }
-        
+
         if (global.top_window_group.get_children().length == 0)
             global.set_stage_input_region(rects);
         else
