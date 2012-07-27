@@ -6,22 +6,11 @@ Description: Fix how link dependencies are specified
 Author: Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
 Origin: vendor
 Forwarded: no
-Last-Update: 2012-07-06
+Last-Update: 2012-07-28
 
---- a/src/Makefile-calendar-server.am
-+++ b/src/Makefile-calendar-server.am
-@@ -18,7 +18,7 @@
- 	$(CALENDAR_SERVER_CFLAGS)		\
- 	$(NULL)
- 
--cinnamon_calendar_server_LDFLAGS =		\
-+cinnamon_calendar_server_LDADD =		\
- 	$(CALENDAR_SERVER_LIBS)			\
- 	$(NULL)
- 
 --- a/src/Makefile-hotplug-sniffer.am
 +++ b/src/Makefile-hotplug-sniffer.am
-@@ -15,7 +15,7 @@
+@@ -15,7 +15,7 @@ cinnamon_hotplug_sniffer_CFLAGS =		\
  	$(CINNAMON_HOTPLUG_SNIFFER_CFLAGS)		\
  	$(NULL)
  
@@ -30,9 +19,11 @@ Last-Update: 2012-07-06
  	$(CINNAMON_HOTPLUG_SNIFFER_LIBS)		\
  	$(NULL)
  
+diff --git a/src/Makefile-st.am b/src/Makefile-st.am
+index e9ad239..3167bb2 100644
 --- a/src/Makefile-st.am
 +++ b/src/Makefile-st.am
-@@ -175,7 +175,6 @@
+@@ -175,7 +175,6 @@ libst_1_0_la_SOURCES =				\
  	$(st_built_sources)			\
  	$(NULL)
  libst_1_0_la_CPPFLAGS = $(st_cflags)
@@ -40,9 +31,11 @@ Last-Update: 2012-07-06
  
  noinst_PROGRAMS += test-theme
  
+diff --git a/src/Makefile-tray.am b/src/Makefile-tray.am
+index 1377e0c..2d32c9f 100644
 --- a/src/Makefile-tray.am
 +++ b/src/Makefile-tray.am
-@@ -49,7 +49,6 @@
+@@ -49,7 +49,6 @@ libtray_la_SOURCES =		\
  	$(tray_built_sources)	\
  	$(NULL)
  libtray_la_CPPFLAGS = $(tray_cflags)

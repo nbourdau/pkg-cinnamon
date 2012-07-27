@@ -6,7 +6,7 @@ Last-Update: 2012-07-06
 
 --- a/files/Makefile.in
 +++ b/files/Makefile.in
-@@ -2,6 +2,8 @@
+@@ -2,6 +2,8 @@ all:
  
  clean:
  

@@ -1,6 +1,4 @@
 fix-distclean.patch
 disable-bluetooth-applet.patch
 fixbuildflags.patch
-respect-disable-schemas-install.patch
-install-gir.patch
 desktop-files-standardized.patch

@@ -26,4 +26,4 @@ override_dh_makeshlibs:
 
 override_dh_shlibdeps:
 	dh_shlibdeps
-	dh_girepository -l/usr/lib/$(DEB_HOST_MULTIARCH)/cinnamon -p/usr/lib/$(DEB_HOST_MULTIARCH)/muffin /usr/lib/$(DEB_HOST_MULTIARCH)/cinnamon
+	dh_girepository -l src -p/usr/lib/$(DEB_HOST_MULTIARCH)/muffin /usr/lib/$(DEB_HOST_MULTIARCH)/cinnamon
