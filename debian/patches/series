@@ -1,4 +1,4 @@
 fix-distclean.patch
-disable-bluetooth-applet.patch
+disable-bluetooth-applet-hack.patch
 fixbuildflags.patch
 desktop-files-standardized.patch
