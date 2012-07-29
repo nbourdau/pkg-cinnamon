@@ -2,3 +2,4 @@ fix-distclean.patch
 disable-bluetooth-applet-hack.patch
 fixbuildflags.patch
 desktop-files-standardized.patch
+libexecdir-with-package-name.patch
