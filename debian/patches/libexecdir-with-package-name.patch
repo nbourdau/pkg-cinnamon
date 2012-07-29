@@ -3,7 +3,8 @@ Description: Install auxiliary binaries in subdirectory of libdir
  them in its <packagename> subdir.
 Author: Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
 Origin: vendor
-Forwarded: no
+Forwarded: https://github.com/linuxmint/Cinnamon/pull/987
+Applied-Upstream: no
 Last-Update: 2012-07-29
 
 --- a/src/Makefile-hotplug-sniffer.am

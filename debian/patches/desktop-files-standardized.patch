@@ -1,7 +1,8 @@
 Description: Make some .desktop files standard compliant
 Author: Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
 Origin: vendor
-Forwarded: no
+Forwarded: https://github.com/linuxmint/Cinnamon/pull/987
+Applied-Upstream: no
 Last-Update: 2012-07-29
 
 --- a/data/cinnamon.desktop.in.in

@@ -2,8 +2,9 @@ Description: Disable bluetooth applet hack
  The hack prevent the Debian package to build properly.
 Author: Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
 Origin: vendor
-Forwarded: no
-Last-Update: 2012-07-28
+Forwarded: https://github.com/linuxmint/Cinnamon/pull/987
+Applied-Upstream: no
+Last-Update: 2012-07-29
 
 --- a/src/cinnamon-plugin.c
 +++ b/src/cinnamon-plugin.c
