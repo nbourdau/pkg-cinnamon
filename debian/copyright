@@ -9,54 +9,11 @@ Copyright: Colin Walters
            Marina Zhurakhinskaya
            Owen Taylor
            William Jon McCann
-           2011-2012, Clement Lefebvre <clement.lefebvre@linuxmint.com>
-           2011-2012, Gwendal Le Bihan <gwendal.lebihan.dev@gmail.com>
-           2012, Albert Pool <albertpool@solcon.nl>
-           2012, Alexander Shopov <ash@kambanaria.org>
-           2012, Alin Trăistaru <alindt@gmail.com>
-           2012, Andreas N <gedemiti@gmail.com>
-           2012, Antonio Fernandes C. Neto <fernandesn@gnome.org>
-           2012, Arash Mousavi <amousavi@src.gnome.org>
-           2012, Aurimas Černius <aurisc4@gmail.com>
-           2012, Bruce Cowan <bruce@bcowan.me.uk>
-           2012, Bruno Brouard <annoa.b@gmail.com>
-           2012, Carles Ferrando <carles.ferrando@gmail.com>
-           2012, Daniel Mustieles <daniel.mustieles@gmail.com>
-           2012, Daniel Nylander <po@danielnylander.se>
-           2012, Diego Rocha <dreckr@gmail.com>
-           2012, Djavan Fagundes <djavanf@gnome.org>
-           2012, Dreckr <dreckr@gmail.com>
-           2012, Florian Müllner <fmuellner@gnome.org>
-           2012, Gil Forcada <gforcada@gnome.org>
-           2012, Giovanni Campagna <gcampagna@src.gnome.org>
-           2012, Hideki Yamane <henrich@debian.org>
-           2012, Jasper St. Pierre <jstpierre@mecheye.net>
-           2012, Jürg Billeter <j@bitron.ch>
-           2012, Kevin Cunningham <kevin.cunningham3@gmail.com>
-           2012, Kjartan Maraas <kmaraas@gnome.org>
-           2012, Kris Thomsen <lakristho@gmail.com>
-           2012, Kristjan SCHMIDT <kristjan.schmidt@googlemail.com>
-           2012, Lukasz Stosik <lstosik@gmail.com>
-           2012, M4he <markus.xp@web.de>
-           2012, Marek Černocký <marek@manet.cz>
-           2012, Marina Zhurakhinskaya <marinaz@redhat.com>
-           2012, Markus Hentsch <ma.hentsch@gmail.com>
-           2012, Matej Urbančič <mateju@svn.gnome.org>
-           2012, Nelson Marques <nmo.marques@ua.pt>
-           2012, Nguyễn Thái Ngọc Duy <pclouds@gmail.com>
-           2012, Owen W. Taylor <otaylor@fishsoup.net>
-           2012, Pavel Vasin <rat4vier@gmail.com>
-           2012, Ray Strode <rstrode@redhat.com>
-           2012, Ville-Pekka Vainio <vpvainio@iki.fi>
-           2012, chamfay <chamfay@gmail.com>
-           2012, dalcde <dalcde@yahoo.com.hk>
-           2012, glebihan <gwendal.lebihan.dev@gmail.com>
-           2012, ipraveen <mail2ipn@gmail.com>
-           2012, ketheriel <nmo.marques@gmail.com>
-           2012, korst <jasperkorst@gmail.com>
-           2012, leigh123linux <leigh123linux@googlemail.com>
-           2012, tesfabpel <tesfabpel@gmail.com>
-           2012, Žygimantas Beručka <uid0@akl.lt>
+           2011, 2012 Clement Lefebvre
+           2011, 2012 Gwendal Le Bihan
+           2012 Michael Webster
+           2012 Per Ångström
+           2012 ebbes
 License: GPL-2+
 
 Files: src/* js/*
@@ -68,24 +25,38 @@ Copyright: 2000, Helix Code, Inc.
            2006-2008, Red Hat, Inc.
            2007, Ryan Lortie
            2008, Intel Corp.
+           2012 Albert Pool
+           2011, 2012 Clement Lefebvre
+           2012 Diego Rocha
+           2011, 2012 Gwendal Le Bihan
+           2011, 2012 Jasper St. Pierre
+           2012 Michael Webster
+           2012 Pavel Vasin
+           2012 dalcde
 License: GPL-2+
 
 Files: src/tray/*
 Copyright: 2002, Anders Carlsson <andersca@gnu.org>
            2003-2006, Vincent Untz
            2008, Red Hat, Inc.
+           2011 Clement Lefebvre
 License: GPL-2+
 
 Files: src/st/*
 Copyright: 2008, OpenedHand
            2009, Intel Corporation.
            2003-2004, Dodji Seketeli
+           2011 Clement Lefebvre
+           2012 Gwendal Le Bihan
+           2011 Jasper St. Pierre
+           2012 Michael Webster
+           2012 Owen W. Taylor
 License: LGPL-2.1
 
 
 Files: debian/*
-Copyright: 2011-2012, Clement Lefebvre <clement.lefebvre@linuxmint.com>
-	   2012,  Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
+Copyright: 2012, Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
+           2011-2012, Clement Lefebvre
 License: GPL-2+
 
 
