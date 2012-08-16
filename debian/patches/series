@@ -1,5 +1,6 @@
 fix-distclean.patch
-disable-bluetooth-applet-hack.patch
 fixbuildflags.patch
 desktop-files-standardized.patch
 libexecdir-with-package-name.patch
+fix-systray-icons-not-showing-up.patch
+fix-systray-tooltips-flashing.patch

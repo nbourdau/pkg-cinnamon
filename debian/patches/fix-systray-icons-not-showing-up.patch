@@ -1,0 +1,26 @@
+Description: Improved fix for systray icons not showing up - fixes liferea
+Author: Clement Lefebvre <clement.lefebvre@linuxmint.com>
+Origin: upstream, https://github.com/linuxmint/Cinnamon/commit/35c9d8b66983f
+Applied-Upstream: yes
+Last-Update: 2012-08-16
+
+---
+ files/usr/share/cinnamon/applets/systray@cinnamon.org/applet.js |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/files/usr/share/cinnamon/applets/systray@cinnamon.org/applet.js b/files/usr/share/cinnamon/applets/systray@cinnamon.org/applet.js
+index d1cdf5f..ae60c84 100644
+--- a/files/usr/share/cinnamon/applets/systray@cinnamon.org/applet.js
++++ b/files/usr/share/cinnamon/applets/systray@cinnamon.org/applet.js
+@@ -61,7 +61,7 @@ MyApplet.prototype = {
+                 height = themeNode.get_length('height');                        
+             }
+             
+-            if (buggyIcons.indexOf(role) != -1) {
++            if (icon.get_width() == 1 || icon.get_height() == 1 || buggyIcons.indexOf(role) != -1) {
+                 icon.set_height(height);
+             }
+             else {
+-- 
+1.7.10.4
+
