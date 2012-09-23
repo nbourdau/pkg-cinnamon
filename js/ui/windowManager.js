@@ -366,27 +366,28 @@ WindowManager.prototype = {
         let effect = "none";
         let time = 0.25;
         try{
-            effect = global.settings.get_string("desktop-effects-unmaximize-effect");                                                
-            transition = global.settings.get_string("desktop-effects-unmaximize-transition");                        
+            effect = global.settings.get_string("desktop-effects-unmaximize-effect");
+            transition = global.settings.get_string("desktop-effects-unmaximize-transition");
             time = global.settings.get_int("desktop-effects-unmaximize-time") / 1000;
         }
         catch(e) {
             log(e);
         }
-                
-        if (effect == "scale") {            
-            //Not available yet because it doesn't look good..
-            this._unmaximizing.push(actor);            
+
+        if (effect == "scale") {
+
+            this._unmaximizing.push(actor);
             
-            actor.opacity =0;
-            actor.move_anchor_point_from_gravity(Clutter.Gravity.CENTER);
-                 
+            let scale_x = targetWidth / actor.width;
+            let scale_y = targetHeight / actor.height;
+            let anchor_x = (actor.x - targetX) * actor.width / (targetWidth - actor.width);
+            let anchor_y = (actor.y - targetY) * actor.height / (targetHeight - actor.height);
+
+            actor.move_anchor_point(anchor_x, anchor_y);
+
             Tweener.addTween(actor,
-                         { x: targetX, 
-                           y: targetY,                                            
-                           height: targetHeight,
-                           width: targetWidth,
-                           opacity: 100,
+                         { scale_x: scale_x,
+                           scale_y: scale_y,
                            time: time,
                            transition: transition,
                            onComplete: this._unmaximizeWindowDone,
@@ -396,10 +397,11 @@ WindowManager.prototype = {
                            onOverwriteScope: this,
                            onOverwriteParams: [cinnamonwm, actor]
                             });
+
         }
         else {
             cinnamonwm.completed_unmaximize(actor);
-        }   
+        }
     },
 
     _unmaximizeWindowDone : function(cinnamonwm, actor) {
@@ -750,28 +752,30 @@ WindowManager.prototype = {
 
         cinnamonwm.completed_switch_workspace();                        
     },
-    
+
     showWorkspaceOSD : function() {
-        if (global.settings.get_boolean("workspace-osd-visible")) {            
+        if (global.settings.get_boolean("workspace-osd-visible")) {
             let current_workspace_index = global.screen.get_active_workspace_index();
-            let monitor = Main.layoutManager.primaryMonitor;                
+            let monitor = Main.layoutManager.primaryMonitor;
             let label = new St.Label({style_class:'workspace-osd'});
             label.set_text(Main.getWorkspaceName(current_workspace_index));
-            label.set_opacity = 0;                             
-            Main.layoutManager.addChrome(label, { visibleInFullscreen: false });    
+            label.set_opacity = 0;
+            Main.layoutManager.addChrome(label, { visibleInFullscreen: false, affectsInputRegion: false });
             let workspace_osd_x = global.settings.get_int("workspace-osd-x");
             let workspace_osd_y = global.settings.get_int("workspace-osd-y");
             let x = (monitor.width * workspace_osd_x /100 - label.width/2);
             let y = (monitor.height * workspace_osd_y /100 - label.height/2);
             label.set_position(x, y);  
-            let duration = global.settings.get_int("workspace-osd-duration") / 1000;                
-            Tweener.addTween(label, { opacity: 255,                                                        
-                    time: duration,                   
-                    transition: 'linear',                                       
-                    onComplete: function() { Main.layoutManager.removeChrome(label); } });            
+            let duration = global.settings.get_int("workspace-osd-duration") / 1000;
+            Tweener.addTween(label, {   opacity: 255,
+                                        time: duration,
+                                        transition: 'linear',
+                                        onComplete: function() {
+                                            Main.layoutManager.removeChrome(label);
+                                        }});
         }
     },
-        
+
     _startAppSwitcher : function(display, screen, window, binding) {
         
         let tabPopup = new AltTab.AltTabPopup();
@@ -788,18 +792,22 @@ WindowManager.prototype = {
 
     _moveWindowToWorkspaceLeft : function(display, screen, window, binding) {
         let workspace = global.screen.get_active_workspace().get_neighbor(Meta.MotionDirection.LEFT)
-        window.change_workspace(workspace);    
-        workspace.activate(global.get_current_time());
-        window.raise();
-        this.showWorkspaceOSD();
+        if (workspace != global.screen.get_active_workspace()) {
+            window.change_workspace(workspace);
+            workspace.activate(global.get_current_time());
+            window.raise();
+            this.showWorkspaceOSD();
+        }
     },
 
     _moveWindowToWorkspaceRight : function(display, screen, window, binding) {
         let workspace = global.screen.get_active_workspace().get_neighbor(Meta.MotionDirection.RIGHT)
-        window.change_workspace(workspace);    
-        workspace.activate(global.get_current_time());
-        window.raise();
-        this.showWorkspaceOSD();
+        if (workspace != global.screen.get_active_workspace()) {
+            window.change_workspace(workspace);
+            workspace.activate(global.get_current_time());
+            window.raise();
+            this.showWorkspaceOSD();
+        }
     },
 
     _showWorkspaceSwitcher : function(display, screen, window, binding) {

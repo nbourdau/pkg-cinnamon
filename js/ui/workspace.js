@@ -37,11 +37,12 @@ const BUTTON_LAYOUT_KEY = 'button-layout';
 // Each triplet is [xCenter, yCenter, scale] where the scale
 // is relative to the width of the workspace.
 const POSITIONS = {
-        1: [[0.5, 0.5, 0.95]],
-        2: [[0.25, 0.5, 0.48], [0.75, 0.5, 0.48]],
-        3: [[0.25, 0.25, 0.48],  [0.75, 0.25, 0.48],  [0.5, 0.75, 0.48]],
-        4: [[0.25, 0.25, 0.47],   [0.75, 0.25, 0.47], [0.25, 0.75, 0.47], [0.75, 0.75, 0.47]],
-        5: [[0.165, 0.25, 0.32], [0.495, 0.25, 0.32], [0.825, 0.25, 0.32], [0.25, 0.75, 0.32], [0.75, 0.75, 0.32]]
+        1: [[0.5, 0.525, 0.875]],
+        2: [[0.25, 0.525, 0.48], [0.75, 0.525, 0.48]],
+        3: [[0.25, 0.275, 0.48],  [0.75, 0.275, 0.48],  [0.5, 0.75, 0.48]],
+        4: [[0.25, 0.275, 0.47],   [0.75, 0.275, 0.47], [0.25, 0.75, 0.47], [0.75, 0.75, 0.47]],
+        5: [[0.165, 0.25, 0.32], [0.495, 0.25, 0.32], [0.825, 0.25, 0.32], [0.25, 0.75, 0.32], [0.75, 0.75, 0.32]],
+        6: [[0.165, 0.25, 0.32], [0.495, 0.25, 0.32], [0.825, 0.25, 0.32], [0.165, 0.75, 0.32], [0.495, 0.75, 0.32], [0.825, 0.75, 0.32]]
 };
 // Used in _orderWindowsPermutations, 5! = 120 which is probably the highest we can go
 const POSITIONING_PERMUTATIONS_MAX = 5;
@@ -544,7 +545,7 @@ WindowOverlay.prototype = {
 
     chromeHeights: function () {
         return [this.closeButton.height - this.closeButton._overlap,
-               this.title.height + this.title._spacing];
+               this._applicationIconBox.height + this.title._spacing];
     },
 
     /**
@@ -726,16 +727,16 @@ Workspace.prototype = {
 
         this.actor.connect('destroy', Lang.bind(this, this._onDestroy));
 
-        let windows = Main.getTabList(this.metaWorkspace);
+        let windows = global.get_window_actors().filter(this._isMyWindow, this);
+        windows.reverse(); // we want the most-recently-used windows first
 
         // Create clones for windows that should be
         // visible in the Overview
         this._windows = [];
         this._windowOverlays = [];
         for (let i = 0; i < windows.length; i++) {
-            let window = windows[i].get_compositor_private();
-            if (this._isOverviewWindow(window)) {
-                this._addWindowClone(window);
+            if (this._isOverviewWindow(windows[i])) {
+                this._addWindowClone(windows[i]);
             }
         }
 
@@ -760,11 +761,10 @@ Workspace.prototype = {
     selectAnotherWindow: function(symbol) {
         let numWindows = this._windowOverlays.length;
         if (numWindows === 0) {
-            return;
+            return false;
         }
-        if (this._kbWindowIndex > -1 && this._kbWindowIndex < numWindows) {
-            this._windowOverlays[this._kbWindowIndex].setSelected(false);
-        }
+        let currentIndex = this._kbWindowIndex;
+        let nextIndex = -1;
 
         if (numWindows > 3 // grid navigation is not suited for a low window count
             && (symbol === Clutter.Down || symbol === Clutter.Up))
@@ -772,8 +772,8 @@ Workspace.prototype = {
             let numCols = Math.ceil(Math.sqrt(numWindows));
             let numRows = Math.ceil(numWindows/numCols);
 
-            let curRow = Math.floor(this._kbWindowIndex/numCols);
-            let curCol = this._kbWindowIndex % numCols;
+            let curRow = Math.floor(currentIndex/numCols);
+            let curCol = currentIndex % numCols;
 
             let calcNewIndex = function(rowDelta) {
                 let newIndex = (curRow + rowDelta) * numCols + curCol;
@@ -805,20 +805,39 @@ Workspace.prototype = {
             };
 
             if (symbol === Clutter.Down) {
-                this._kbWindowIndex = calcNewIndex(1);
+                nextIndex = calcNewIndex(1);
             }
             if (symbol === Clutter.Up) {
-                this._kbWindowIndex = calcNewIndex(-1);
+                nextIndex = calcNewIndex(-1);
             }
         }
-        else if (symbol === Clutter.Left || symbol === Clutter.Up) {
-            this._kbWindowIndex = (this._kbWindowIndex < 1 ? numWindows : this._kbWindowIndex) - 1;
+        else if (symbol === Clutter.Left || symbol === Clutter.ISO_Left_Tab || symbol === Clutter.Up) {
+            nextIndex = (currentIndex < 1 ? numWindows : currentIndex) - 1;
         }
-        else if (symbol === Clutter.Right || symbol === Clutter.Down) {
-            this._kbWindowIndex = (this._kbWindowIndex + 1) % numWindows;
+        else if (symbol === Clutter.Right || symbol === Clutter.Tab || symbol === Clutter.Down) {
+            nextIndex = (currentIndex + 1) % numWindows;
+        }
+        else if (symbol === Clutter.Home) {
+            nextIndex = 0;
+        }
+        else if (symbol === Clutter.End) {
+            nextIndex = numWindows - 1;
+        }
+        else {
+            return false; // not handled
         }
 
-        this._windowOverlays[this._kbWindowIndex].setSelected(true);
+        if (currentIndex !== nextIndex) {
+            if (currentIndex > -1 && currentIndex < numWindows) {
+                this._windowOverlays[currentIndex].setSelected(false);
+            }
+        }
+
+        this._kbWindowIndex = currentIndex = nextIndex;
+        if (currentIndex > -1 && currentIndex < numWindows) {
+            this._windowOverlays[currentIndex].setSelected(true);
+        }
+        return true;
     },
     
     activateSelectedWindow: function() {
@@ -1068,22 +1087,17 @@ Workspace.prototype = {
         let buttonOuterWidth = 0;
 
         if (this._windowOverlays[0]) {
-            [buttonOuterHeight, captionHeight] = this._windowOverlays[0].chromeHeights();
+            [buttonOuterHeight, captionIconHeight] = this._windowOverlays[0].chromeHeights();
             buttonOuterWidth = this._windowOverlays[0].chromeWidth();
-        } else
-            [buttonOuterHeight, captionHeight] = [0, 0];
-
+        } else {
+            [buttonOuterHeight, captionIconHeight] = [0, 0];
+        }
         let scale = Math.min((width - buttonOuterWidth) / rect.width,
-                             (height - buttonOuterHeight - captionHeight) / rect.height,
+                             (height - buttonOuterHeight - captionIconHeight) / rect.height,
                              1.0);
 
         x = Math.floor(x + (width - scale * rect.width) / 2);
-
-        // We want to center the window in case we have just one
-        if (metaWindow.get_workspace().n_windows == 1)
-            y = Math.floor(y + (height - scale * rect.height) / 2);
-        else
-            y = Math.floor(y + height - rect.height * scale - captionHeight);
+        y = Math.floor(y + ((height - (scale * rect.height)) / 2) - captionIconHeight);
 
         return [x, y, scale];
     },
@@ -1517,7 +1531,8 @@ Workspace.prototype = {
 
     // Tests if @win should be shown in the Overview
     _isOverviewWindow : function (win) {
-        return true;
+        let tracker = Cinnamon.WindowTracker.get_default();
+        return tracker.is_window_interesting(win.get_meta_window());
     },
 
     // Create a clone of a (non-desktop) window and add it to the window list
@@ -1584,11 +1599,10 @@ Workspace.prototype = {
         let gridWidth = Math.ceil(Math.sqrt(numberOfWindows));
         let gridHeight = Math.ceil(numberOfWindows / gridWidth);
 
-        let fraction = 0.95 * (1. / gridWidth);
+        let fraction = 0.825 * (1. / gridWidth);
 
         let xCenter = (.5 / gridWidth) + ((windowIndex) % gridWidth) / gridWidth;
         let yCenter = (.5 / gridHeight) + Math.floor((windowIndex / gridWidth)) / gridHeight;
-
         return [xCenter, yCenter, fraction];
     },
 

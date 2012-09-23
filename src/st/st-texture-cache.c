@@ -1357,9 +1357,9 @@ load_sliced_image (GSimpleAsyncResult *result,
 
   width = gdk_pixbuf_get_width (pix);
   height = gdk_pixbuf_get_height (pix);
-  for (y = 0; y < height; y += data->grid_width)
+  for (y = 0; y < height; y += data->grid_height)
     {
-      for (x = 0; x < width; x += data->grid_height)
+      for (x = 0; x < width; x += data->grid_width)
         {
           GdkPixbuf *pixbuf = gdk_pixbuf_new_subpixbuf (pix, x, y, data->grid_width, data->grid_height);
           g_assert (pixbuf != NULL);
@@ -1659,7 +1659,7 @@ st_texture_cache_load_icon_name (StTextureCache    *cache,
     case ST_ICON_FADED:
       themed = g_themed_icon_new_with_default_fallbacks (name);
       cache_key = g_strdup_printf ("faded-icon:%s,size=%d", name, size);
-      data.name = name;
+      data.name = g_strdup (name);
       data.size = size;
       cogltexture = st_texture_cache_load (st_texture_cache_get_default (),
                                       cache_key,
@@ -1667,6 +1667,7 @@ st_texture_cache_load_icon_name (StTextureCache    *cache,
                                       create_faded_icon_cpu,
                                       &data,
                                       NULL);
+      g_free (data.name);
       g_free (cache_key);
 
       if (cogltexture != COGL_INVALID_HANDLE)

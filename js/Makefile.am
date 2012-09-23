@@ -21,6 +21,8 @@ nobase_dist_js_DATA = \
 	ui/autorunManager.js    \
 	ui/boxpointer.js	\
 	ui/calendar.js		\
+	ui/checkBox.js		\
+	ui/radioButton.js	\
 	ui/dnd.js		\
 	ui/edgeFlip.js  	\
 	ui/endSessionDialog.js	\
@@ -29,6 +31,7 @@ nobase_dist_js_DATA = \
 	ui/expoThumbnail.js	\
 	ui/expoView.js		\
 	ui/extensionSystem.js	\
+	ui/flashspot.js		\
 	ui/iconGrid.js		\
 	ui/keyboard.js		\
 	ui/layout.js		\

@@ -249,13 +249,11 @@ function start() {
         panel = new Panel.Panel(true);           
         panel.actor.add_style_class_name('panel-bottom');
         layoutManager.panelBox.add(panel.actor);
-        layoutManager._updateBoxes();
     }
     else if (desktop_layout == LAYOUT_FLIPPED) {
         panel = new Panel.Panel(false);                 
         panel.actor.add_style_class_name('panel-top');
         layoutManager.panelBox.add(panel.actor);  
-        layoutManager._updateBoxes();
     }
     else if (desktop_layout == LAYOUT_CLASSIC) {
         panel = new Panel.Panel(false);         
@@ -264,9 +262,9 @@ function start() {
         panel2.actor.add_style_class_name('panel-bottom');
         layoutManager.panelBox.add(panel.actor);   
         layoutManager.panelBox2.add(panel2.actor);   
-        layoutManager._updateBoxes();
     }
-                
+    layoutManager._updateBoxes();
+    
     wm = new WindowManager.WindowManager();
     messageTray = new MessageTray.MessageTray();
     keyboard = new Keyboard.Keyboard();
@@ -276,7 +274,7 @@ function start() {
     placesManager = new PlacesManager.PlacesManager();    
     automountManager = new AutomountManager.AutomountManager();
     //autorunManager = new AutorunManager.AutorunManager();
-    networkAgent = new NetworkAgent.NetworkAgent();
+    //networkAgent = new NetworkAgent.NetworkAgent();
 
     Meta.later_add(Meta.LaterType.BEFORE_REDRAW, _checkWorkspaces);
 
@@ -297,7 +295,7 @@ function start() {
 
     // Provide the bus object for gnome-session to
     // initiate logouts.
-    EndSessionDialog.init();
+    //EndSessionDialog.init();
 
     // Attempt to become a PolicyKit authentication agent
     PolkitAuthenticationAgent.init()
@@ -316,7 +314,7 @@ function start() {
         Scripting.runPerfScript(module, perfOutput);
     }
     
-    workspace_names = global.settings.get_strv("workspace-names");  
+    workspace_names = global.settings.get_strv("workspace-name-overrides");  
 
     global.screen.connect('notify::n-workspaces', _nWorkspacesChanged);
 
@@ -330,6 +328,16 @@ function start() {
     applets = AppletManager.loadApplets();
 }
 
+function enablePanels() {
+    if (panel) panel.enable();
+    if (panel2) panel2.enable();
+}
+
+function disablePanels() {
+    if (panel) panel.disable();
+    if (panel2) panel2.disable();
+}
+
 let _workspaces = [];
 let _checkWorkspacesId = 0;
 
@@ -341,13 +349,35 @@ let _checkWorkspacesId = 0;
  */
 const LAST_WINDOW_GRACE_TIME = 1000;
 
+function _fillWorkspaceNames(index) {
+    // ensure that we have workspace names up to index
+    for (let i = index - workspace_names.length; i > 0; --i) {
+        workspace_names.push('');
+    }
+}
+
+function _trimWorkspaceNames(index) {
+    // trim empty or out-of-bounds names from the end.
+    for (let i = workspace_names.length - 1;
+            i >= 0 && (i >= nWorks || !workspace_names[i].length); --i)
+    {
+        workspace_names.pop();
+    }
+}
+
+function _makeDefaultWorkspaceName(index) {
+    return _("WORKSPACE") + " " + (index + 1).toString();
+}
+
 function setWorkspaceName(index, name) {
-    if (index < workspace_names.length) {
-        name.trim();
-        if (name != workspace_names[index]) {
-            workspace_names[index] = name;
-            global.settings.set_strv("workspace-names", workspace_names);
-        }
+    name.trim();
+    if (name != getWorkspaceName(index)) {
+        _fillWorkspaceNames(index);
+        workspace_names[index] = (name == _makeDefaultWorkspaceName(index) ?
+            "" :
+            name);
+        _trimWorkspaceNames();
+        global.settings.set_strv("workspace-name-overrides", workspace_names);
     }
 }
 
@@ -358,15 +388,14 @@ function getWorkspaceName(index) {
     wsName.trim();
     return wsName.length > 0 ?
         wsName :
-        _("WORKSPACE") + " " + (index + 1).toString();
+        _makeDefaultWorkspaceName(index);
 }
 
 function _addWorkspace() {
     if (dynamicWorkspaces)
         return false;
     nWorks++;
-    global.settings.set_int("number-workspaces", nWorks);    
-    workspace_names.push("");    
+    global.settings.set_int("number-workspaces", nWorks);
     _staticWorkspaces();
     return true;
 }
@@ -375,8 +404,12 @@ function _removeWorkspace(workspace) {
     if (nWorks == 1 || dynamicWorkspaces)
         return false;
     nWorks--;
-    let index = workspace.index();    
-    workspace_names.splice (index,1);    
+    let index = workspace.index();
+    if (index < workspace_names.length) {
+        workspace_names.splice (index,1);
+    }
+    _trimWorkspaceNames();
+    global.settings.set_strv("workspace-name-overrides", workspace_names);
     global.settings.set_int("number-workspaces", nWorks);
     global.screen.remove_workspace(workspace, global.get_current_time());
     return true;
@@ -1078,13 +1111,18 @@ function getTabList(workspaceOpt, screenOpt) {
     // the correct tab order.
     let allwindows = display.get_tab_list(Meta.TabList.NORMAL_ALL, screen,
                                        workspace);
+    let registry = {}; // to avoid duplicates
     let tracker = Cinnamon.WindowTracker.get_default();
     for (let i = 0; i < allwindows.length; ++i) {
         let window = allwindows[i];
+        let seqno = window.get_stable_sequence();
         // Add "normal" windows and those that don't have an "app".
-        if (normalLookup[window.get_stable_sequence()] === 1 || !tracker.get_window_app(window))
+        if (normalLookup[seqno] === 1 || !tracker.get_window_app(window))
         {
-            windows.push(window);
+            if (!registry[seqno]) {
+                windows.push(window);
+                registry[seqno] = true;
+            }
         }
     }
     return windows;

@@ -3,7 +3,7 @@ BUILT_SOURCES =
 CLEANFILES =
 EXTRA_DIST =
 bin_SCRIPTS =
-libexec_PROGRAMS =
+pkglibexec_PROGRAMS =
 noinst_LTLIBRARIES =
 noinst_PROGRAMS =
 service_in_files =
@@ -22,7 +22,9 @@ service_DATA = $(service_in_files:.service.in=.service)
 %.service: %.service.in Makefile
 	$(AM_V_GEN)									\
 		[ -d $(@D) ] || $(mkdir_p) $(@D) ;					\
-		sed -e "s|\@libexecdir\@|$(libexecdir)|" $< > $@.tmp && mv $@.tmp $@
+		sed -e "s|\@libexecdir\@|$(libexecdir)|" \
+		    -e "s|\@pkglibexecdir\@|$(pkglibexecdir)|" $< > $@.tmp && mv $@.tmp $@
+
 CLEANFILES += $(service_DATA)
 
 CLEANFILES += $(gir_DATA) $(typelib_DATA)
@@ -54,6 +56,7 @@ generated_script_substitutions = \
 	    -e "s|@libdir[@]|$(libdir)|" \
 	    -e "s|@JHBUILD_TYPELIBDIR[@]|$(JHBUILD_TYPELIBDIR)|" \
 	    -e "s|@pkgdatadir[@]|$(pkgdatadir)|" \
+	    -e "s|@pkglibexecdir[@]|$(pkglibexecdir)|" \
 	    -e "s|@PYTHON[@]|$(PYTHON)|" \
 	    -e "s|@VERSION[@]|$(VERSION)|" \
 	    -e "s|@sysconfdir[@]|$(sysconfdir)|"
@@ -82,6 +85,7 @@ cinnamon_cflags =				\
 	-DCINNAMON_LIBEXECDIR=\"$(libexecdir)\"	\
 	-DCINNAMON_DATADIR=\"$(pkgdatadir)\"	\
 	-DCINNAMON_PKGLIBDIR=\"$(pkglibdir)\" \
+	-DCINNAMON_PKGLIBEXECDIR=\"$(pkglibexecdir)\"	\
 	-DJSDIR=\"$(pkgdatadir)/js\"
 
 privlibdir = $(pkglibdir)
@@ -110,6 +114,8 @@ cinnamon_public_headers_h =		\
 	cinnamon-mount-operation.h		\
 	cinnamon-network-agent.h		\
 	cinnamon-perf-log.h		\
+	cinnamon-screenshot.h	\
+	cinnamon-screen-grabber.h	\
 	cinnamon-slicer.h			\
 	cinnamon-stack.h			\
 	cinnamon-tray-icon.h		\
@@ -147,6 +153,8 @@ libcinnamon_la_SOURCES =		\
 	cinnamon-perf-log.c		\
 	cinnamon-polkit-authentication-agent.h	\
 	cinnamon-polkit-authentication-agent.c	\
+	cinnamon-screenshot.c		\
+	cinnamon-screen-grabber.c	\
 	cinnamon-slicer.c			\
 	cinnamon-stack.c			\
 	cinnamon-tray-icon.c		\
@@ -191,7 +199,7 @@ endif BUILD_RECORDER
 
 ########################################
 
-libexec_PROGRAMS += cinnamon-perf-helper
+pkglibexec_PROGRAMS += cinnamon-perf-helper
 
 cinnamon_perf_helper_SOURCES = cinnamon-perf-helper.c
 cinnamon_perf_helper_CPPFLAGS = $(CINNAMON_PERF_HELPER_CFLAGS)
@@ -272,7 +280,7 @@ Cinnamon_0_1_gir_CFLAGS = $(libcinnamon_la_CPPFLAGS) -I $(srcdir)
 Cinnamon_0_1_gir_LIBS = libcinnamon.la
 Cinnamon_0_1_gir_FILES = $(libcinnamon_la_gir_sources)
 Cinnamon_0_1_gir_SCANNERFLAGS = --include-uninstalled=$(builddir)/St-1.0.gir \
-	--add-include-path=$(MUFFIN_GIR_DIR) -L $(BLUETOOTH_DIR)
+	--add-include-path=$(MUFFIN_GIR_DIR) $(if $(BLUETOOTH_DIR),-L $(BLUETOOTH_DIR),)
 INTROSPECTION_GIRS += Cinnamon-0.1.gir
 CLEANFILES += Cinnamon-0.1.gir
 

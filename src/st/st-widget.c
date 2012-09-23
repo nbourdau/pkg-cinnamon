@@ -593,8 +593,9 @@ st_widget_get_theme_node (StWidget *widget)
 
       if (stage == NULL)
         {
-          g_error ("st_widget_get_theme_node called on the widget %s which is not in the stage.",
+          g_critical ("st_widget_get_theme_node called on the widget %s which is not in the stage.",
                     st_describe_actor (CLUTTER_ACTOR (widget)));
+          return NULL;
         }
 
       if (parent_node == NULL)
@@ -1026,7 +1027,7 @@ st_widget_class_init (StWidgetClass *klass)
  */
 void
 st_widget_set_theme (StWidget  *actor,
-                      StTheme  *theme)
+                     StTheme   *theme)
 {
   StWidgetPrivate *priv = actor->priv;
 
@@ -1034,11 +1035,11 @@ st_widget_set_theme (StWidget  *actor,
 
   priv = actor->priv;
 
-  if (theme !=priv->theme)
+  if (theme != priv->theme)
     {
       if (priv->theme)
         g_object_unref (priv->theme);
-      priv->theme = g_object_ref (priv->theme);
+      priv->theme = g_object_ref (theme);
 
       st_widget_style_changed (actor);
 
@@ -2110,18 +2111,17 @@ st_describe_actor (ClutterActor *actor)
   if (name)
     g_string_append_printf (desc, " \"%s\"", name);
 
-  if (!append_actor_text (desc, actor) && CLUTTER_IS_CONTAINER (actor))
+  if (!append_actor_text (desc, actor))
     {
       GList *children, *l;
 
       /* Do a limited search of @actor's children looking for a label */
-      children = clutter_container_get_children (CLUTTER_CONTAINER (actor));
+      children = clutter_actor_get_children (actor);
       for (l = children, i = 0; l && i < 20; l = l->next, i++)
         {
           if (append_actor_text (desc, l->data))
             break;
-          else if (CLUTTER_IS_CONTAINER (l->data))
-            children = g_list_concat (children, clutter_container_get_children (l->data));
+          children = g_list_concat (children, clutter_actor_get_children (l->data));
         }
       g_list_free (children);
     }

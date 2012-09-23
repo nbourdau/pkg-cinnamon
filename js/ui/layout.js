@@ -44,17 +44,11 @@ LayoutManager.prototype = {
                                            vertical: true });
 
         this.panelBox2 = new St.BoxLayout({ name: 'panelBox',
-                                            vertical: true });                                           
-        
-        let autohide = global.settings.get_boolean("panel-autohide");
-        if (autohide) {
-            this.addChrome(this.panelBox, { affectsStruts: false, addToWindowgroup: false });
-            this.addChrome(this.panelBox2, { affectsStruts: false, addToWindowgroup: false });
-        }
-        else {
-            this.addChrome(this.panelBox, { affectsStruts: true, addToWindowgroup: false });
-            this.addChrome(this.panelBox2, { affectsStruts: true, addToWindowgroup: false });
-        }
+                                            vertical: true });        
+
+        this.addChrome(this.panelBox, { addToWindowgroup: false });
+        this.addChrome(this.panelBox2, { addToWindowgroup: false });
+        this._processPanelSettings();
         this.panelBox.connect('allocation-changed',
                               Lang.bind(this, this._updatePanelBarriers));
         this.panelBox2.connect('allocation-changed',
@@ -74,7 +68,10 @@ LayoutManager.prototype = {
         this._chrome.addActor(this._hotCorner.actor);
         this.enabledEdgeFlip = global.settings.get_boolean("enable-edge-flip");
         global.settings.connect("changed::enable-edge-flip", Lang.bind(this, this._onEnableEdgeFlipChanged));
-        global.settings.connect("changed::panel-autohide", Lang.bind(this, this._onPanelAutoHideChanged));
+        global.settings.connect("changed::panel-autohide", Lang.bind(this, this._processPanelSettings));
+        global.settings.connect("changed::panel-resizable", Lang.bind(this, this._processPanelSettings));
+        global.settings.connect("changed::panel-bottom-height", Lang.bind(this, this._processPanelSettings));
+        global.settings.connect("changed::panel-top-height", Lang.bind(this, this._processPanelSettings));
         global.settings.connect("changed::overview-corner-visible", Lang.bind(this, this._onOverviewCornerVisibleChanged));
         global.settings.connect("changed::overview-corner-hover", Lang.bind(this, this._onOverviewCornerHoverChanged));
         global.settings.connect("changed::overview-corner-position", Lang.bind(this, this._updateBoxes));
@@ -85,7 +82,7 @@ LayoutManager.prototype = {
     },
 
     _onEnableEdgeFlipChanged: function(){
-        this.enableEdgeFlip = global.settings.get_boolean("enable-edge-flip");
+        this.enabledEdgeFlip = global.settings.get_boolean("enable-edge-flip");
         this.edgeRight.enabled = this.enabledEdgeFlip;
         this.edgeLeft.enabled = this.enabledEdgeFlip;
     },
@@ -120,16 +117,17 @@ LayoutManager.prototype = {
         }
     },
     
-    _onPanelAutoHideChanged: function() {            
-        let autohide = global.settings.get_boolean("panel-autohide");
-        if (autohide) {
-            this._chrome.modifyActorParams(this.panelBox, { affectsStruts: false });
-            this._chrome.modifyActorParams(this.panelBox2, { affectsStruts: false });
+    _processPanelSettings: function() {
+        if (this._processPanelSettingsTimeout) {
+            Mainloop.source_remove(this._processPanelSettingsTimeout);
         }
-        else {
-            this._chrome.modifyActorParams(this.panelBox, { affectsStruts: true });
-            this._chrome.modifyActorParams(this.panelBox2, { affectsStruts: true });
-        }
+        // delay this action somewhat, to let others do their thing before us
+        this._processPanelSettingsTimeout = Mainloop.timeout_add(0, Lang.bind(this, function() {
+            this._processPanelSettingsTimeout = 0;
+            this._updateBoxes();
+            this._chrome.modifyActorParams(this.panelBox, { affectsStruts: Main.panel && !Main.panel.isHideable() });
+            this._chrome.modifyActorParams(this.panelBox2, { affectsStruts: Main.panel2 && !Main.panel2.isHideable() });
+        }));
     },
     
     _onOverviewCornerVisibleChanged: function() {            
@@ -175,74 +173,26 @@ LayoutManager.prototype = {
     },
 
     _updateHotCorners: function() {
-        // destroy old hot corners
-        for (let i = 0; i < this._hotCorners.length; i++)
-            this._hotCorners[i].destroy();
-        this._hotCorners = [];
-
-        // build new hot corners
-        for (let i = 0; i < this.monitors.length; i++) {
-            if (i == this.primaryIndex)
-                continue;
-
-            let monitor = this.monitors[i];
-            let cornerX = this._rtl ? monitor.x + monitor.width : monitor.x;
-            let cornerY = monitor.y;
-
-            let haveTopLeftCorner = true;
-
-            // Check if we have a top left (right for RTL) corner.
-            // I.e. if there is no monitor directly above or to the left(right)
-            let besideX = this._rtl ? monitor.x + 1 : cornerX - 1;
-            let besideY = cornerY;
-            let aboveX = cornerX;
-            let aboveY = cornerY - 1;
-
-            for (let j = 0; j < this.monitors.length; j++) {
-                if (i == j)
-                    continue;
-                let otherMonitor = this.monitors[j];
-                if (besideX >= otherMonitor.x &&
-                    besideX < otherMonitor.x + otherMonitor.width &&
-                    besideY >= otherMonitor.y &&
-                    besideY < otherMonitor.y + otherMonitor.height) {
-                    haveTopLeftCorner = false;
-                    break;
-                }
-                if (aboveX >= otherMonitor.x &&
-                    aboveX < otherMonitor.x + otherMonitor.width &&
-                    aboveY >= otherMonitor.y &&
-                    aboveY < otherMonitor.y + otherMonitor.height) {
-                    haveTopLeftCorner = false;
-                    break;
-                }
-            }
-
-            if (!haveTopLeftCorner)
-                continue;
-
-            let _hotCorner = new HotCorner();            
-            this._hotCorners.push(_hotCorner);
-            _hotCorner.actor.set_position(cornerX, cornerY);
-            this._chrome.addActor(_hotCorner.actor);
+        let hotCornerPosition = global.settings.get_string("overview-corner-position");
+        let x = this.primaryMonitor.x;
+        let y = this.primaryMonitor.y;
+        if (hotCornerPosition == "topLeft") {
+            this._hotCorner.actor.set_position(x, y);            
+            this.overviewCorner.set_position(x + 1, y + 1);
+        } else if (hotCornerPosition == "topRight") {
+            this._hotCorner.actor.set_position(x + this.primaryMonitor.width - 1, y);            
+            this.overviewCorner.set_position(x + this.primaryMonitor.width - 33, y + 1);
+        } else if (hotCornerPosition == "bottomLeft") {
+            this._hotCorner.actor.set_position(x, this.primaryMonitor.height - 1);            
+            this.overviewCorner.set_position(x + 1, this.primaryMonitor.height - 33);
+        } else if (hotCornerPosition == "bottomRight") {
+            this._hotCorner.actor.set_position(x + this.primaryMonitor.width - 1, this.primaryMonitor.height - 1);
+            this.overviewCorner.set_position(x + this.primaryMonitor.width - 33, this.primaryMonitor.height - 33);
         }
     },
 
     _updateBoxes: function() {                
-        let hotCornerPosition = global.settings.get_string("overview-corner-position");
-        if (hotCornerPosition == "topLeft") {
-            this._hotCorner.actor.set_position(this.primaryMonitor.x,this.primaryMonitor.y);            
-            this.overviewCorner.set_position(this.primaryMonitor.x + 1, this.primaryMonitor.y + 1);
-        } else if (hotCornerPosition == "topRight") {
-            this._hotCorner.actor.set_position(this.primaryMonitor.width - 1,this.primaryMonitor.y);            
-            this.overviewCorner.set_position(this.primaryMonitor.width - 33, this.primaryMonitor.y + 1);
-        } else if (hotCornerPosition == "bottomLeft") {
-            this._hotCorner.actor.set_position(this.primaryMonitor.x,this.primaryMonitor.height - 1);            
-            this.overviewCorner.set_position(this.primaryMonitor.x + 1, this.primaryMonitor.height - 33);
-        } else if (hotCornerPosition == "bottomRight") {
-            this._hotCorner.actor.set_position(this.primaryMonitor.width - 1,this.primaryMonitor.height - 1);
-            this.overviewCorner.set_position(this.primaryMonitor.width - 33, this.primaryMonitor.height - 33);
-        }
+        this._updateHotCorners();
 
         this.overviewCorner.set_size(32, 32);
 
@@ -256,33 +206,68 @@ LayoutManager.prototype = {
         else
             this.overviewCorner.hide();
             
-        // Need to use GSettings to get the panel height instead of hard-coding it
-        if (Main.desktop_layout == Main.LAYOUT_TRADITIONAL) {       
-            let panelHeight = 25;
-            if (Main.panel) {
-                panelHeight = Main.panel.actor.get_height();
+        let getPanelHeight = function(panel) {
+            let panelHeight = 0;
+            if (panel) {
+                panelHeight = panel.actor.get_height();
             }
-            this.panelBox.set_position(this.bottomMonitor.x, this.bottomMonitor.y + this.bottomMonitor.height - panelHeight);
-            this.panelBox.set_size(this.bottomMonitor.width, panelHeight);
+            return panelHeight;
+        };
+
+        let p1height = getPanelHeight(Main.panel);
+
+        if (Main.desktop_layout == Main.LAYOUT_TRADITIONAL) {
+            this.panelBox.set_size(this.bottomMonitor.width, p1height);
+            this.panelBox.set_position(this.bottomMonitor.x, this.bottomMonitor.y + this.bottomMonitor.height - p1height);
         }
-        else if (Main.desktop_layout == Main.LAYOUT_FLIPPED) {         
+        else if (Main.desktop_layout == Main.LAYOUT_FLIPPED) {
+            this.panelBox.set_size(this.primaryMonitor.width, p1height);
             this.panelBox.set_position(this.primaryMonitor.x, this.primaryMonitor.y);
-            this.panelBox.set_size(this.primaryMonitor.width, -1);            
         }
         else if (Main.desktop_layout == Main.LAYOUT_CLASSIC) { 
-            let panelHeight = 25;
-            if (Main.panel2) {
-                panelHeight = Main.panel2.actor.get_height();
-            }
+            let p2height = getPanelHeight(Main.panel2);
+
+            this.panelBox.set_size(this.primaryMonitor.width, p1height);
             this.panelBox.set_position(this.primaryMonitor.x, this.primaryMonitor.y);
-            this.panelBox.set_size(this.primaryMonitor.width, -1);       
-            this.panelBox2.set_position(this.bottomMonitor.x, this.bottomMonitor.y + this.bottomMonitor.height - panelHeight);
-            this.panelBox2.set_size(this.bottomMonitor.width, panelHeight);       
+
+            this.panelBox2.set_size(this.bottomMonitor.width, p2height);
+            this.panelBox2.set_position(this.bottomMonitor.x, this.bottomMonitor.y + this.bottomMonitor.height - p2height);
         }
-        
+
         this.keyboardBox.set_position(this.bottomMonitor.x,
                                       this.bottomMonitor.y + this.bottomMonitor.height);
         this.keyboardBox.set_size(this.bottomMonitor.width, -1);
+        this._chrome._queueUpdateRegions();
+    },
+
+    getPorthole: function() {
+        let porthole = {};
+        let screen = {x: 0, y: 0, width: global.screen_width, height: global.screen_height};
+        
+        let getPanelHeight = function(panel) {
+            let panelHeight = 0;
+            let hideable = true;
+            if (panel) {
+                panelHeight = panel.actor.get_height();
+                hideable = panel.isHideable();
+            }
+            return hideable ? 0 : panelHeight;
+        };
+        let p1height = getPanelHeight(Main.panel);
+        if (Main.desktop_layout == Main.LAYOUT_TRADITIONAL) {       
+            porthole.x = screen.x; porthole.y = screen.y;
+            porthole.width = screen.width; porthole.height = screen.height - p1height;
+        }
+        else if (Main.desktop_layout == Main.LAYOUT_FLIPPED) {         
+            porthole.x = screen.x; porthole.y = screen.y + p1height;
+            porthole.width = screen.width; porthole.height = screen.height - p1height;
+        }
+        else if (Main.desktop_layout == Main.LAYOUT_CLASSIC) {
+            let p2height = getPanelHeight(Main.panel2);
+            porthole.x = screen.x; porthole.y = screen.y + p1height;
+            porthole.width = screen.width; porthole.height = screen.height - p1height - p2height;
+        }
+        return porthole;
     },
 
     _updatePanelBarriers: function(panelBox) {
@@ -313,10 +298,10 @@ LayoutManager.prototype = {
             else {
                 let primary = this.primaryMonitor;
                 leftPanelBarrier = global.create_pointer_barrier(primary.x, primary.y,
-                                                                 -primary.x, primary.y + panelBox.height, 
+                                                                 primary.x, primary.y + panelBox.height,
                                                                  1 /* BarrierPositiveX */);
                 rightPanelBarrier = global.create_pointer_barrier(primary.x + primary.width, primary.y,
-                                                                  -primary.x + primary.width, primary.y + panelBox.height, 
+                                                                  primary.x + primary.width, primary.y + panelBox.height,
                                                                   4 /* BarrierNegativeX */);
             }
         } else {
@@ -812,7 +797,7 @@ Chrome.prototype = {
         for (var i in params){
             this._trackedActors[index][i] = params[i];
         }
-        this.updateRegions();
+        this._queueUpdateRegions();
     },
 
     _trackActor: function(actor, params) {
@@ -956,7 +941,7 @@ Chrome.prototype = {
     },
 
     thawUpdateRegions: function() {
-        this._freezeUpdateCount--;
+        this._freezeUpdateCount = --this._freezeUpdateCount >= 0 ? this.freezeUpdateCount : 0;
         this._queueUpdateRegions();
     },
 
@@ -1038,11 +1023,14 @@ Chrome.prototype = {
     },
 
     updateRegions: function() {
+        let primary = this._primaryMonitor;
+        if (!primary) return false;
+
         let rects = [], struts = [], i;
 
         if (this._updateRegionIdle) {
             Mainloop.source_remove(this._updateRegionIdle);
-            delete this._updateRegionIdle;
+            this._updateRegionIdle = 0;
         }
 
         for (i = 0; i < this._trackedActors.length; i++) {
@@ -1090,7 +1078,6 @@ Chrome.prototype = {
             // the width/height across the middle of the screen, then
             // we don't create a strut for it at all.
             let side;
-            let primary = this._primaryMonitor;
             if (x1 <= primary.x && x2 >= primary.x + primary.width) {
                 if (y1 <= primary.y)
                     side = Meta.Side.TOP;
@@ -1138,7 +1125,15 @@ Chrome.prototype = {
             struts.push(strut);
         }
 
-        if (global.top_window_group.get_children().length == 0)
+        let enable_stage = true;
+        let top_windows = global.top_window_group.get_children();
+        for (var i in top_windows){
+            if (top_windows[i]._windowType != Meta.WindowType.TOOLTIP){
+                enable_stage = false;
+                break;
+            }
+        }
+        if (enable_stage)
             global.set_stage_input_region(rects);
         else
             global.set_stage_input_region([]);

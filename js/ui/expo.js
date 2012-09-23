@@ -21,57 +21,6 @@ const ADD_BUTTON_HOVER_TIME = 0.3;
 
 const DND_WINDOW_SWITCH_TIMEOUT = 1250;
 
-function CinnamonInfo() {
-    this._init();
-}
-
-CinnamonInfo.prototype = {
-    _init: function() {
-        this._source = null;
-        this._undoCallback = null;
-    },
-
-    _onUndoClicked: function() {
-        if (this._undoCallback)
-            this._undoCallback();
-        this._undoCallback = null;
-
-        if (this._source)
-            this._source.destroy();
-    },
-
-    setMessage: function(text, undoCallback, undoLabel) {
-        if (this._source == null) {
-            this._source = new MessageTray.SystemNotificationSource();
-            this._source.connect('destroy', Lang.bind(this,
-                function() {
-                    this._source = null;
-                }));
-            Main.messageTray.add(this._source);
-        }
-
-        let notification = null;
-        if (this._source.notifications.length == 0) {
-            notification = new MessageTray.Notification(this._source, text, null);
-        } else {
-            notification = this._source.notifications[0];
-            notification.update(text, null, { clear: true });
-        }
-
-        notification.setTransient(true);
-
-        this._undoCallback = undoCallback;
-        if (undoCallback) {
-            notification.addButton('system-undo',
-                                   undoLabel ? undoLabel : _("Undo"));
-            notification.connect('action-invoked',
-                                 Lang.bind(this, this._onUndoClicked));
-        }
-
-        this._source.notify(notification);
-    }
-};
-
 function Expo() {
     this._init.apply(this, arguments);
 }
@@ -114,12 +63,11 @@ Expo.prototype = {
                 }
             }));
 
-        this._workspacesDisplay = null;
         this._expo = null;
 
         this.visible = false;           // animating to overview, in overview, animating out
         this._shown = false;            // show() and not hide()
-        this._shownTemporarily = false; // showTemporarily() and not hilog("huasuhashusu");deTemporarily()
+        this._shownTemporarily = false; // showTemporarily() and not hideTemporarily()
         this._modal = false;            // have a modal grab
         this.animationInProgress = false;
         this._hideInProgress = false;
@@ -169,8 +117,6 @@ Expo.prototype = {
         this._addWorkspaceButton.hide();
         this._windowCloseArea.hide();
 
-        this._needsFakePointerEvent = false;
-
         global.stage.connect('key-press-event',
             Lang.bind(this, function(actor, event) {
                 if (this._shown) {
@@ -199,29 +145,11 @@ Expo.prototype = {
         if (this.isDummy)
             return;
 
-        this._CinnamonInfo = new CinnamonInfo();
-    
         this._expo = new ExpoView.ExpoView();
         this._group.add_actor(this._expo.actor);
 
         Main.layoutManager.connect('monitors-changed', Lang.bind(this, this._relayout));
         this._relayout();
-    },
-
-    setMessage: function(text, undoCallback, undoLabel) {
-        if (this.isDummy)
-            return;
-
-        this._CinnamonInfo.setMessage(text, undoCallback, undoLabel);
-    },
-
-    _fakePointerEvent: function() {
-        let display = Gdk.Display.get_default();
-        let deviceManager = display.get_device_manager();
-        let pointer = deviceManager.get_client_pointer();
-        let [screen, pointerX, pointerY] = pointer.get_position();
-
-        pointer.warp(screen, pointerX, pointerY);
     },
 
     _relayout: function () {
@@ -233,13 +161,13 @@ Expo.prototype = {
         let primary = Main.layoutManager.primaryMonitor;
         let rtl = (St.Widget.get_default_direction () == St.TextDirection.RTL);
 
-        let contentY = Main.panel.actor.height;
-        let contentHeight = primary.height - contentY - Main.panel.actor.height;
+        let contentY = 0;
+        let contentHeight = primary.height;
 
         this._group.set_position(primary.x, primary.y);
         this._group.set_size(primary.width, primary.height);
 
-        this._group.set_clip(primary.x, primary.y, primary.width, primary.height);
+        this._group.set_clip(0, primary.y, primary.width, primary.height);
 
         this._gradient.set_position(0, 0);
         this._gradient.set_size(primary.width, primary.height);
@@ -356,29 +284,15 @@ Expo.prototype = {
 
         this.activeWorkspace = this._expo._thumbnailsBox._lastActiveWorkspace;
         let activeWorkspaceActor = this.activeWorkspace.actor;
-        this._expo._thumbnailsBox._lastActiveWorkspace._fadeOutUninterestingWindows();
 
         this.allocateID = this.activeWorkspace.connect('allocated', Lang.bind(this, this._animateVisible2));
 
         this._createClone(activeWorkspaceActor);
-        if (global.settings.get_string("desktop-layout") != 'traditional' && !global.settings.get_boolean("panel-autohide"))
-            this.clone.set_position(0, Main.panel.actor.height); 
-
         this.clone.show();
 
         this._gradient.show();
-        
-        if (Main.panel)
-            Tweener.addTween(Main.panel.actor, {    opacity: 0, 
-                                                    time: ANIMATION_TIME, 
-                                                    transition: 'easeOutQuad', 
-                                                    onComplete: function(){Main.panel.actor.hide();}});
-        if (Main.panel2)
-            Tweener.addTween(Main.panel2.actor, {   opacity: 0, 
-                                                    time: ANIMATION_TIME, 
-                                                    transition: 'easeOutQuad', 
-                                                    onComplete: function(){Main.panel2.actor.hide();}});
-        
+        Main.disablePanels();
+
         this._background.dim_factor = 1;
         Tweener.addTween(this._background,
                             { dim_factor: 0.4,
@@ -395,7 +309,7 @@ Expo.prototype = {
         this.emit('showing');
     },
 
-    //We need to allocate activeWorkspace before we begin it's clone animation
+    //We need to allocate activeWorkspace before we begin its clone animation
     _animateVisible2: function() {
         this.activeWorkspace.disconnect(this.allocateID);
         let activeWorkspaceActor = this._expo._thumbnailsBox._lastActiveWorkspace.actor;
@@ -508,25 +422,8 @@ Expo.prototype = {
 
         this.animationInProgress = true;
         this._hideInProgress = true;
-        let maximizedWindow = false;
-        let windows = global.screen.get_active_workspace().list_windows();
-        for (let i = 0; i < windows.length; i++) {
-            let metaWindow = windows[i];
-            if (metaWindow.showing_on_its_workspace() &&
-                metaWindow.maximized_horizontally &&
-                metaWindow.maximized_vertically)
-                maximizedWindow = true;
-        }
 
-        if (Main.panel){
-            Main.panel.actor.show();
-            Tweener.addTween(Main.panel.actor, {opacity: 255, time: ANIMATION_TIME, transition: 'easeOutQuad'});
-        }
-        if (Main.panel2){
-            Main.panel2.actor.show();
-            Tweener.addTween(Main.panel2.actor, {opacity: 255, time: ANIMATION_TIME, transition: 'easeOutQuad'});
-        }
-
+        Main.enablePanels();
         Tweener.addTween(this._background,
                          { dim_factor: 1,
                            time: ANIMATION_TIME,
@@ -537,19 +434,15 @@ Expo.prototype = {
 
         this.activeWorkspace = this._expo._thumbnailsBox._lastActiveWorkspace;
         let activeWorkspaceActor = this.activeWorkspace.actor;
-        //this.activeWorkspace._fadeInUninterestingWindows();
         this.activeWorkspace._overviewModeOff();
         this._createClone(activeWorkspaceActor);
         this.clone.set_position(activeWorkspaceActor.allocation.x1, activeWorkspaceActor.allocation.y1);
         this.clone.set_scale(activeWorkspaceActor.get_scale()[0], activeWorkspaceActor.get_scale()[1]);
-        this.clone.show();
-        let y = 0;
-        if (global.settings.get_string("desktop-layout") != 'traditional' && !global.settings.get_boolean("panel-autohide"))
-            y = Main.panel.actor.height; 
-        Tweener.addTween(this.clone, {  x: 0, 
-                                        y: y, 
-                                        scale_x: 1 , 
-                                        scale_y: 1, 
+        let porthole = Main.layoutManager.getPorthole();
+        Tweener.addTween(this.clone, {  x: porthole.x, 
+                                        y: porthole.y,
+                                        scale_x: 1,
+                                        scale_y: 1,
                                         time: ANIMATION_TIME, 
                                         transition: 'easeOutQuad', 
                                         onComplete: this.hide});
@@ -599,12 +492,6 @@ Expo.prototype = {
             this._animateVisible();
 
         this._syncInputMode();
-
-        // Fake a pointer event if requested
-        if (this._needsFakePointerEvent) {
-            this._fakePointerEvent();
-            this._needsFakePointerEvent = false;
-        }
 
         Main.layoutManager._chrome.updateRegions();
     }
