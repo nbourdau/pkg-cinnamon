@@ -99,8 +99,8 @@ const MediaServer2PlayerIFace = {
 
 /* global values */
 let icon_path = "/usr/share/cinnamon/theme/";
-let compatible_players = [ "clementine", "mpd", "exaile", "banshee", "rhythmbox", "rhythmbox3", "pragha", "quodlibet", "guayadeque", "amarok", "googlemusicframe", "xbmc", "xnoise", "gmusicbrowser", "spotify", "audacious", "vlc" ];
-let support_seek = [ "clementine", "banshee", "rhythmbox", "rhythmbox3", "pragha", "quodlibet", "amarok", "xnoise", "gmusicbrowser", "spotify", "vlc" ];
+let compatible_players = [ "clementine", "mpd", "exaile", "banshee", "rhythmbox", "rhythmbox3", "pragha", "quodlibet", "guayadeque", "amarok", "googlemusicframe", "xbmc", "xnoise", "gmusicbrowser", "spotify", "audacious", "vlc", "beatbox" ];
+let support_seek = [ "clementine", "banshee", "rhythmbox", "rhythmbox3", "pragha", "quodlibet", "amarok", "xnoise", "gmusicbrowser", "spotify", "vlc", "beatbox" ];
 /* dummy vars for translation */
 let x = _("Playing");
 x = _("Paused");
@@ -694,15 +694,15 @@ MediaPlayerLauncher.prototype = {
 
 };
 
-function MyApplet(orientation) {
-    this._init(orientation);
+function MyApplet(orientation, panel_height) {
+    this._init(orientation, panel_height);
 }
 
 MyApplet.prototype = {
     __proto__: Applet.IconApplet.prototype,
 
-    _init: function(orientation) {
-        Applet.IconApplet.prototype._init.call(this, orientation);
+    _init: function(orientation, panel_height) {
+        Applet.IconApplet.prototype._init.call(this, orientation, panel_height);
 
         try {
             this.menuManager = new PopupMenu.PopupMenuManager(this);
@@ -741,13 +741,18 @@ MyApplet.prototype = {
 
             this.actor.connect('scroll-event', Lang.bind(this, this._onScrollEvent));
 
+            this.mute_out_switch = new PopupMenu.PopupSwitchMenuItem(_("Mute output"), false);
+            this.mute_in_switch = new PopupMenu.PopupSwitchMenuItem(_("Mute input"), false);
+            this._applet_context_menu.addMenuItem(this.mute_out_switch);
+            this._applet_context_menu.addMenuItem(this.mute_in_switch);
+            this.mute_out_switch.connect('toggled', Lang.bind(this, this._toggle_out_mute));
+            this.mute_in_switch.connect('toggled', Lang.bind(this, this._toggle_in_mute));
+
             this._control.open();
 
             this._volumeControlShown = false;
 
             this._showFixedElements();
-
-
         }
         catch (e) {
             global.logError(e);
@@ -756,6 +761,26 @@ MyApplet.prototype = {
 
     on_applet_clicked: function(event) {
         this.menu.toggle();
+    },
+
+    _toggle_out_mute: function() {
+        if (this._output.is_muted) {
+            this._output.change_is_muted(false);
+            this.mute_out_switch.setToggleState(false);
+        } else {
+            this._output.change_is_muted(true);
+            this.mute_out_switch.setToggleState(true);
+        }
+    },
+
+    _toggle_in_mute: function() {
+        if (this._input.is_muted) {
+            this._input.change_is_muted(false);
+            this.mute_in_switch.setToggleState(false);
+        } else {
+            this._input.change_is_muted(true);
+            this.mute_in_switch.setToggleState(true);
+        }
     },
 
     _onScrollEvent: function(actor, event) {
@@ -934,11 +959,19 @@ MyApplet.prototype = {
                 this._outputTitle.setIcon('audio-volume-muted');
                 this.set_applet_tooltip(_("Volume") + ": 0%");
                 this._outputTitle.setText(_("Volume") + ": 0%");
+                this.mute_out_switch.setToggleState(true);
             } else {
                 this.setIconName(this._volumeToIcon(this._output.volume));
                 this._outputTitle.setIcon(this._volumeToIcon(this._output.volume));
                 this.set_applet_tooltip(_("Volume") + ": " + Math.floor(this._output.volume / this._volumeMax * 100) + "%");
                 this._outputTitle.setText(_("Volume") + ": " + Math.floor(this._output.volume / this._volumeMax * 100) + "%");
+                this.mute_out_switch.setToggleState(false);
+            }
+        } else if (property == '_input') {
+            if (muted) {
+                this.mute_in_switch.setToggleState(true);
+            } else {
+                this.mute_in_switch.setToggleState(false);
             }
         }
     },
@@ -1057,7 +1090,7 @@ MyApplet.prototype = {
 
 };
 
-function main(metadata, orientation) {
-    let myApplet = new MyApplet(orientation);
+function main(metadata, orientation, panel_height) {
+    let myApplet = new MyApplet(orientation, panel_height);
     return myApplet;
 }

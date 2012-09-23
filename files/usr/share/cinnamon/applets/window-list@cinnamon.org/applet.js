@@ -11,8 +11,11 @@ const Meta = imports.gi.Meta;
 const Tooltips = imports.ui.tooltips;
 const DND = imports.ui.dnd;
 
-const PANEL_ICON_SIZE = 24;
+const PANEL_ICON_SIZE = 24; // this is for the spinner when loading
+const DEFAULT_ICON_SIZE = 16; // too bad this can't be defined in theme (cinnamon-app.create_icon_texture returns a clutter actor, not a themable object -
+                              // probably something that could be addressed
 const SPINNER_ANIMATION_TIME = 1;
+const ICON_HEIGHT_FACTOR = .64;
 
 
 function AppMenuButtonRightClickMenu(actor, metaWindow, orientation) {
@@ -29,7 +32,7 @@ AppMenuButtonRightClickMenu.prototype = {
         //Main.chrome.addActor(this.actor, { visibleInOverview: true,
         //                                   affectsStruts: false });
         this.actor.hide();
-
+        this.window_list = actor._delegate._applet._windows;
         actor.connect('key-press-event', Lang.bind(this, this._onSourceKeyPress));        
         this.connect('open-state-changed', Lang.bind(this, this._onToggled));        
 
@@ -37,6 +40,12 @@ AppMenuButtonRightClickMenu.prototype = {
 
         this.itemCloseWindow = new PopupMenu.PopupMenuItem(_("Close"));
         this.itemCloseWindow.connect('activate', Lang.bind(this, this._onCloseWindowActivate));        
+
+        this.itemCloseAllWindows = new PopupMenu.PopupMenuItem(_("Close all"));
+        this.itemCloseAllWindows.connect('activate', Lang.bind(this, this._onCloseAllActivate));
+
+        this.itemCloseOtherWindows = new PopupMenu.PopupMenuItem(_("Close others"));
+        this.itemCloseOtherWindows.connect('activate', Lang.bind(this, this._onCloseOthersActivate));
 
         if (metaWindow.minimized)
             this.itemMinimizeWindow = new PopupMenu.PopupMenuItem(_("Restore"));
@@ -61,14 +70,20 @@ AppMenuButtonRightClickMenu.prototype = {
             this.addMenuItem(this.itemMoveToLeftWorkspace);
             this.addMenuItem(this.itemMoveToRightWorkspace);
             this.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+            this.addMenuItem(this.itemCloseAllWindows);
+            this.addMenuItem(this.itemCloseOtherWindows);
+            this.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
             this.addMenuItem(this.itemMinimizeWindow);
-            this.addMenuItem(this.itemMaximizeWindow);
+            this.addMenuItem(this.itemMaximizeWindow);            
             this.addMenuItem(this.itemCloseWindow);                        
         }
         else {
-            this.addMenuItem(this.itemCloseWindow);
+            this.addMenuItem(this.itemCloseWindow);            
             this.addMenuItem(this.itemMaximizeWindow);
             this.addMenuItem(this.itemMinimizeWindow);
+            this.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+            this.addMenuItem(this.itemCloseOtherWindows);
+            this.addMenuItem(this.itemCloseAllWindows);
             this.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
             this.addMenuItem(this.itemMoveToLeftWorkspace);
             this.addMenuItem(this.itemMoveToRightWorkspace);
@@ -109,6 +124,28 @@ AppMenuButtonRightClickMenu.prototype = {
     _onCloseWindowActivate: function(actor, event){
         this.metaWindow.delete(global.get_current_time());
         this.destroy();
+    },
+
+    _onCloseAllActivate: function(actor, event) {
+        let metas = new Array();
+        for (let i = 0; i < this.window_list.length; i++) {
+            metas.push(this.window_list[i].metaWindow);
+        }
+        metas.forEach(Lang.bind(this, function(window) {
+            window.delete(global.get_current_time());
+            }));
+    },
+
+    _onCloseOthersActivate: function(actor, event) {
+        let metas = new Array();
+        for (let i = 0; i < this.window_list.length; i++) {
+            if (this.window_list[i].metaWindow != this.metaWindow) {
+                metas.push(this.window_list[i].metaWindow);
+            }
+        }
+        metas.forEach(Lang.bind(this, function(window) {
+            window.delete(global.get_current_time());
+            }));
     },
 
     _onMinimizeWindowActivate: function(actor, event){
@@ -173,15 +210,15 @@ AppMenuButtonRightClickMenu.prototype = {
 
 };
 
-function AppMenuButton(applet, metaWindow, animation, orientation) {
-    this._init(applet, metaWindow, animation, orientation);
+function AppMenuButton(applet, metaWindow, animation, orientation, panel_height) {
+    this._init(applet, metaWindow, animation, orientation, panel_height);
 }
 
 AppMenuButton.prototype = {
 //    __proto__ : AppMenuButton.prototype,
 
     
-    _init: function(applet, metaWindow, animation, orientation) {
+    _init: function(applet, metaWindow, animation, orientation, panel_height) {
                
         this.actor = new St.Bin({ style_class: 'window-list-item-box',
 								  reactive: true,
@@ -199,7 +236,7 @@ AppMenuButton.prototype = {
         this.actor.connect('button-release-event', Lang.bind(this, this._onButtonRelease));
 
 		this.metaWindow = metaWindow;	
-        
+
         this._applet = applet;	
 		
         let bin = new St.Bin({ name: 'appMenu' });
@@ -254,23 +291,25 @@ AppMenuButton.prototype = {
         this._container.add_actor(this._spinner.actor);
         this._spinner.actor.lower_bottom();
 
-		let tracker = Cinnamon.WindowTracker.get_default();
-		this.app = tracker.get_window_app(this.metaWindow);
-		let iconSize = 16;
-		let icon = this.app ? 
-		    this.app.create_icon_texture(iconSize) :
-            new St.Icon({ icon_name: 'application-default-icon',
-                     icon_type: St.IconType.FULLCOLOR,
-                     icon_size: iconSize });
+        let tracker = Cinnamon.WindowTracker.get_default();
+        this.app = tracker.get_window_app(this.metaWindow);
+        if (global.settings.get_boolean('panel-scale-text-icons') && global.settings.get_boolean('panel-resizable')) {
+            this.iconSize = Math.round(panel_height * ICON_HEIGHT_FACTOR);
+        } else {
+            this.iconSize = DEFAULT_ICON_SIZE;
+        }
 
+        let icon = this.app ?
+                            this.app.create_icon_texture(this.iconSize) :
+                            new St.Icon({ icon_name: 'application-default-icon',
+                                         icon_type: St.IconType.FULLCOLOR,
+                                         icon_size: this.iconSize });
         let title = this.getDisplayTitle();
-
         if (metaWindow.minimized)
             this._label.set_text("[" + title + "]");
         else
             this._label.set_text(title);
         this._iconBox.set_child(icon);
-        
         if(animation){
 			this.startAnimation(); 
 			this.stopAnimation();
@@ -290,12 +329,48 @@ AppMenuButton.prototype = {
         
         this.on_panel_edit_mode_changed();
         global.settings.connect('changed::panel-edit-mode', Lang.bind(this, this.on_panel_edit_mode_changed));
+        global.settings.connect('changed::window-list-applet-scroll', Lang.bind(this, this.on_scroll_mode_changed));
+        this.window_list = this.actor._delegate._applet._windows;
+        this.scroll_connector = null;
+        this.on_scroll_mode_changed();
     },
     
     on_panel_edit_mode_changed: function() {
         this._draggable.inhibit = global.settings.get_boolean("panel-edit-mode");
     }, 
-        
+
+    on_scroll_mode_changed: function() {
+        let scrollable = global.settings.get_boolean("window-list-applet-scroll");
+        if (scrollable) {
+            this.scroll_connector = this.actor.connect('scroll-event', Lang.bind(this, this._onScrollEvent));
+        } else {
+            if (this.scroll_connector) {
+                this.actor.disconnect(this.scroll_connector);
+                this.scroll_connector = null;
+            }
+        }
+    },
+
+    _onScrollEvent: function(actor, event) {
+        let direction = event.get_scroll_direction();
+        let current;
+        let num_windows = this.window_list.length;
+        for (let i = 0; i < num_windows; i++) {
+            if (this.window_list[i].metaWindow.has_focus()) {
+                current = i;
+                break;
+            }
+        }
+        let target;
+        if (direction == 1) {
+            target = ((current - 1) >= 0) ? (current - 1) : (num_windows - 1);
+        }
+        if (direction == 0) {
+            target = ((current + 1) <= num_windows - 1) ? (current + 1) : 0;
+        }
+        this.window_list[target].metaWindow.activate(global.get_current_time());
+    },
+
     _onDragBegin: function() {
         this._tooltip.hide();
         this._tooltip.preventShow = true;
@@ -327,7 +402,7 @@ AppMenuButton.prototype = {
         let tracker = Cinnamon.WindowTracker.get_default();
         let app = tracker.get_window_app(this.metaWindow);
         if ( app ) {  
-            let icon = app.create_icon_texture(16);
+            let icon = app.create_icon_texture(this.iconSize);
     		this._iconBox.set_child(icon);	
         }         
         if (this.metaWindow.has_focus() && !this.metaWindow.minimized) {                                     
@@ -483,7 +558,7 @@ AppMenuButton.prototype = {
         }
         this._iconBox.allocate(childBox, flags);
 
-        let iconWidth = 16;
+        let iconWidth = this.iconSize;
 
         [minWidth, minHeight, naturalWidth, naturalHeight] = this._label.get_preferred_size();
 
@@ -604,8 +679,6 @@ MyAppletBox.prototype = {
         this._clearDragPlaceholder();
         actor.destroy();
         
-        this._applet.saveWindowsOrder();
-        
         return true;
     },
     
@@ -618,21 +691,19 @@ MyAppletBox.prototype = {
     }
 }
 
-function MyApplet(orientation) {
-    this._init(orientation);
+function MyApplet(orientation, panel_height) {
+    this._init(orientation, panel_height);
 }
 
 MyApplet.prototype = {
     __proto__: Applet.Applet.prototype,
 
-    _init: function(orientation) {        
-        Applet.Applet.prototype._init.call(this, orientation);
+    _init: function(orientation, panel_height) {        
+        Applet.Applet.prototype._init.call(this, orientation, panel_height);
         
         try {                    
             this.orientation = orientation;
             this.dragInProgress = false;
-            
-            this._windows_order = {};
             
             this.myactorbox = new MyAppletBox(this);
             this.myactor = this.myactorbox.actor;
@@ -654,12 +725,6 @@ MyApplet.prototype = {
                 this.actor.set_style('margin-bottom: 0px;');
                 this.actor.set_style('padding-bottom: 0px;');
             }
-                                                
-        
-            this._windows = new Array();
-                
-            let tracker = Cinnamon.WindowTracker.get_default();
-            tracker.connect('notify::focus-app', Lang.bind(this, this._onFocus));
 
             this.isInteresting = function(metaWindow) {
                 if (tracker.is_window_interesting(metaWindow)) {
@@ -676,6 +741,10 @@ MyApplet.prototype = {
                 return type === Meta.WindowType.DIALOG || type === Meta.WindowType.MODAL_DIALOG;
             };
 
+            this._windows = new Array();
+
+            let tracker = Cinnamon.WindowTracker.get_default();
+            tracker.connect('notify::focus-app', Lang.bind(this, this._onFocus));
 
             this.switchWorkspaceHandler = global.window_manager.connect('switch-workspace',
                                             Lang.bind(this, this._refreshItems));
@@ -707,27 +776,21 @@ MyApplet.prototype = {
             global.screen.connect('notify::n-workspaces',
                                     Lang.bind(this, this._changeWorkspaces));
             global.display.connect('window-demands-attention', Lang.bind(this, this._onWindowDemandsAttention));
+            global.display.connect('window-marked-urgent', Lang.bind(this, this._onWindowDemandsAttention));
                                     
             // this._container.connect('allocate', Lang.bind(Main.panel, this._allocateBoxes)); 
             
-            global.settings.connect('changed::panel-edit-mode', Lang.bind(this, this.on_panel_edit_mode_changed));                                                                               
+            global.settings.connect('changed::panel-edit-mode', Lang.bind(this, this.on_panel_edit_mode_changed));
         }
         catch (e) {
             global.logError(e);
         }
     },
     
-    saveWindowsOrder: function() {
-        let order = [];
-        let children = this.myactor.get_children();
-        for (var i in children) if (children[i]._delegate && children[i]._delegate.metaWindow) order.push(children[i]._delegate.metaWindow);
-        this._windows_order[global.screen.get_active_workspace()] = order;
-    },
-    
     on_applet_clicked: function(event) {
             
-    },        
-    
+    },
+
     on_panel_edit_mode_changed: function() {
         this.actor.reactive = global.settings.get_boolean("panel-edit-mode");
     }, 
@@ -746,41 +809,19 @@ MyApplet.prototype = {
             this._windows[i].doFocus();
         }
     },
+
+    on_panel_height_changed: function() {
+        this._refreshItems();
+    },
     
     _refreshItems: function() {
-        /* "this.myactor.destroy_children()" produces mysterious warnings:
-        "Clutter-CRITICAL **: clutter_actor_unmap: assertion `CLUTTER_IS_ACTOR (self)' failed",
-        one for each child actor, so let's use a loop instead. */
-
         for ( let i = 0; i < this._windows.length; ++i ) {
-            this.myactor.remove_actor(this._windows[i].actor);
-            this._windows[i].actor.destroy();
-        }
-        this._windows = new Array();
-
-        let metaWorkspace = global.screen.get_active_workspace();
-        let windows = metaWorkspace.list_windows();
-        windows.sort(Lang.bind(this, function(w1, w2) {
-            if (this._windows_order){
-                let order = this._windows_order[metaWorkspace];
-                if (order){
-                    let iw1 = order.indexOf(w1);
-                    let iw2 = order.indexOf(w2);
-                    if (iw1==-1) return 1;
-                    else if (iw2==-1) return -1;
-                    else return iw1 - iw2;
-                }else return w1.get_stable_sequence() - w2.get_stable_sequence;
-            }else return w1.get_stable_sequence() - w2.get_stable_sequence;
-        }));
-                
-        // Create list items for each window
-        for ( let i = 0; i < windows.length; ++i ) {
-            let metaWindow = windows[i];
-            if (this.isInteresting(metaWindow)) {
-                let appbutton = new AppMenuButton(this, metaWindow, false, this.orientation);
-                this._windows.push(appbutton);
-                this.myactor.add(appbutton.actor);
-            }
+            let metaWindow = this._windows[i].metaWindow;
+            if (metaWindow.get_workspace().index() == global.screen.get_active_workspace_index()
+                      || metaWindow.is_on_all_workspaces())
+                this._windows[i].actor.show();
+            else
+                this._windows[i].actor.hide();
         }
 
         this._onFocus();
@@ -832,29 +873,22 @@ MyApplet.prototype = {
     },
   
     _windowAdded: function(metaWorkspace, metaWindow) {
-        if ( metaWorkspace.index() != global.screen.get_active_workspace_index() ) {
-            return;
-        }
-
+        if (!this.isInteresting(metaWindow))
+            return;        
         for ( let i=0; i<this._windows.length; ++i ) {
             if ( this._windows[i].metaWindow == metaWindow ) {
                 return;
             }
         }
 
-        if ( this.isInteresting(metaWindow) ) {
-            let appbutton = new AppMenuButton(this, metaWindow, true, this.orientation);
-            this._windows.push(appbutton);
-            this.myactor.add(appbutton.actor);
-            appbutton.actor.show();
-        }
+        let appbutton = new AppMenuButton(this, metaWindow, true, this.orientation, this._panelHeight);
+        this._windows.push(appbutton);
+        this.myactor.add(appbutton.actor);
+        if (metaWorkspace.index() != global.screen.get_active_workspace_index())
+            appbutton.actor.hide();
     },
 
     _windowRemoved: function(metaWorkspace, metaWindow) {
-        if ( metaWorkspace.index() != global.screen.get_active_workspace_index() ) {
-            return;
-        }
-
         for ( let i=0; i<this._windows.length; ++i ) {
             if ( this._windows[i].metaWindow == metaWindow ) {
                 this.myactor.remove_actor(this._windows[i].actor);
@@ -929,7 +963,7 @@ MyApplet.prototype = {
     }
 };
 
-function main(metadata, orientation) {  
-    let myApplet = new MyApplet(orientation);
+function main(metadata, orientation, panel_height) {  
+    let myApplet = new MyApplet(orientation, panel_height);
     return myApplet;      
 }

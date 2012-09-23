@@ -8,15 +8,15 @@ const St = imports.gi.St;
 const Main = imports.ui.main;
 const Gtk = imports.gi.Gtk;
 
-function MyApplet(metadata, orientation) {
-	this._init(metadata, orientation);
+function MyApplet(metadata, orientation, panel_height) {
+	this._init(metadata, orientation, panel_height);
 };
 
 MyApplet.prototype = {
 	__proto__: Applet.IconApplet.prototype,
 
-    _init: function(metadata, orientation) {
-        Applet.IconApplet.prototype._init.call(this, orientation);
+    _init: function(metadata, orientation, panel_height) {
+        Applet.IconApplet.prototype._init.call(this, orientation, panel_height);
 
 		try {
 			Gtk.IconTheme.get_default().append_search_path(metadata.path);
@@ -40,7 +40,7 @@ MyApplet.prototype = {
 
 			for ( let wks=0; wks<global.screen.n_workspaces; ++wks ) {
 				// construct a list with all windows
-				let workspace_name = Main.workspace_names[wks];
+				let workspace_name = Main.getWorkspaceName(wks);
 				let metaWorkspace = global.screen.get_workspace_by_index(wks);
 				let windows = metaWorkspace.list_windows();				
 				let sticky_windows = windows.filter(
@@ -114,7 +114,7 @@ MyApplet.prototype = {
 	}
 };
 
-function main(metadata, orientation) {
-	let myApplet = new MyApplet(metadata, orientation);
+function main(metadata, orientation, panel_height) {
+	let myApplet = new MyApplet(metadata, orientation, panel_height);
 	return myApplet;
 }

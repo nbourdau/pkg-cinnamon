@@ -51,7 +51,9 @@ ExpoWindowClone.prototype = {
                                               dragActorOpacity: Workspace.DRAGGING_WINDOW_OPACITY });
         this._draggable.connect('drag-begin', Lang.bind(this, this._onDragBegin));
         this._draggable.connect('drag-end', Lang.bind(this, this._onDragEnd));
+        this._draggable.connect('drag-cancelled', Lang.bind(this, this._onDragCancelled));
         this.inDrag = false;
+        this.dragCancelled = false;
 
         // Create an icon for this window. Even though the window
         // may be showing now, it might be minimized later on.
@@ -134,22 +136,18 @@ ExpoWindowClone.prototype = {
     _onDragBegin : function (draggable, time) {
         Main.expo.showCloseArea();
         this.inDrag = true;
+        this.dragCancelled = false;
         this.emit('drag-begin');
+    },
+
+    _onDragCancelled : function (draggable, time) {
+        this.dragCancelled = true;
+        this.emit('drag-cancelled');
     },
 
     _onDragEnd : function (draggable, time, snapback) {
         Main.expo.hideCloseArea();
         this.inDrag = false;
-        // We may not have a parent if DnD completed successfully, in
-        // which case our clone will shortly be destroyed and replaced
-        // with a new one on the target workspace.
-        if (this.actor.get_parent() != null) {
-            if (this._stackAbove == null)
-                this.actor.lower_bottom();
-            else
-                this.actor.raise(this._stackAbove);
-        }
-
         this.emit('drag-end');
     }
 };
@@ -170,12 +168,13 @@ const ThumbnailState = {
 /**
  * @metaWorkspace: a #Meta.Workspace
  */
-function ExpoWorkspaceThumbnail(metaWorkspace) {
-    this._init(metaWorkspace);
+function ExpoWorkspaceThumbnail(metaWorkspace, box) {
+    this._init(metaWorkspace, box);
 }
 
 ExpoWorkspaceThumbnail.prototype = {
-    _init : function(metaWorkspace) {
+    _init : function(metaWorkspace, box) {
+        this.box = box;
         this.metaWorkspace = metaWorkspace;
         this.monitorIndex = Main.layoutManager.primaryIndex;
 
@@ -218,7 +217,9 @@ ExpoWorkspaceThumbnail.prototype = {
         this.titleText.connect('key-focus-out', Lang.bind(this, function() {
             if (!this._undoTitleEdit) {
                 let newName = this.title.get_text().trim();
-                Main.setWorkspaceName(this.metaWorkspace.index(), newName);
+                if (newName != this._origTitle) {
+                    Main.setWorkspaceName(this.metaWorkspace.index(), newName);
+                }
             }
             this.title.set_text(Main.getWorkspaceName(this.metaWorkspace.index()));
         })); 
@@ -228,41 +229,30 @@ ExpoWorkspaceThumbnail.prototype = {
         this._background = Meta.BackgroundActor.new_for_screen(global.screen);
         this._contents.add_actor(this._background);
 
-        let monitor = Main.layoutManager.primaryMonitor;
-        this.setPorthole(monitor.x, monitor.y, monitor.width, monitor.height);
+        let porthole = Main.layoutManager.getPorthole();
+        this.setPorthole(porthole);
        
         this.shade = new St.Bin();
         this.shade.set_style('background-color: black;');
         this.actor.add_actor(this.shade);
-        this.shade.set_size(monitor.width, monitor.height);
+        this.shade.set_size(porthole.width, porthole.height);
 
         this.shade.opacity = INACTIVE_OPACITY;
 
+        this._pendingOverviewModeTimeoutId = null;
         this.removed = false;
 
         if (metaWorkspace == global.screen.get_active_workspace())
             this.shade.opacity = 0;
 
-        let windows = Main.getTabList(this.metaWorkspace);
+        let windows = global.get_window_actors().filter(this._isMyWindow, this);
 
         // Create clones for windows that should be visible in the Expo
         this.count = 0;
         this._windows = [];
-        this._uninterestingWindows = new Clutter.Group();
-        this._uninterestingWindows.hide();
-        this._contents.add_actor(this._uninterestingWindows);
-        this._uninterestingWindows.raise(this._background);
         for (let i = 0; i < windows.length; i++) {
-            let window = windows[i].get_compositor_private();
-            window.meta_window._minimizedChangedId =
-                window.meta_window.connect('notify::minimized',
-                                               Lang.bind(this,
-                                                         this._updateMinimized));
-
-            if (this._isExpoWindow(window)) {
-                this._addWindowClone(window);
-            } else {
-                this._addUninterestingWindowClone(window);
+            if (this._isExpoWindow(windows[i])) {
+                this._addWindowClone(windows[i]);
             }
         }
 
@@ -322,12 +312,11 @@ ExpoWorkspaceThumbnail.prototype = {
             this._highlight(); 
     },
 
-    setPorthole: function(x, y, width, height) {
-        this._portholeX = x;
-        this._portholeY = y;
-        this.actor.set_size(width, height);
-        this._contents.set_position(-x, -y);
-    },
+    setPorthole: function(porthole) {
+        this._porthole = porthole;
+        this.actor.set_size(porthole.width, porthole.height);
+        this._contents.set_position(-porthole.x, -porthole.y);
+     },
 
     _lookupIndex: function (metaWindow) {
         for (let i = 0; i < this._windows.length; i++) {
@@ -388,21 +377,12 @@ ExpoWorkspaceThumbnail.prototype = {
         let clone = this._windows[index];
         this._windows.splice(index, 1);
 
-        if (win && this._isExpoWindow(win)) {
-            if (metaWin._minimizedChangedId) {
-                metaWin.disconnect(metaWin._minimizedChangedId);
-                delete metaWin._minimizedChangedId;
-            }
-        }
         clone.destroy();
         if (this.overviewMode)
             this._overviewModeOn();
     },
 
     _doAddWindow : function(metaWin) {
-        if (this.leavingExpo)
-            return;
-
         let win = metaWin.get_compositor_private();
         
         if (!win) {
@@ -426,11 +406,6 @@ ExpoWorkspaceThumbnail.prototype = {
         if (this._lookupIndex (metaWin) != -1)
             return;
 
-        if (!metaWin._minimizedChangedId)
-            metaWin._minimizedChangedId = metaWin.connect('notify::minimized',
-                                                          Lang.bind(this,
-                                                                    this._updateMinimized));
-
         if (!this._isMyWindow(win) || !this._isExpoWindow(win))
             return;
 
@@ -445,25 +420,26 @@ ExpoWorkspaceThumbnail.prototype = {
 
     _windowAdded : function(metaWorkspace, metaWin) {
         this._doAddWindow(metaWin);
+        this.box.restack();
     },
 
     _windowRemoved : function(metaWorkspace, metaWin) {
         this._doRemoveWindow(metaWin);
+        this.box.restack();
     },
 
     _windowEnteredMonitor : function(metaScreen, monitorIndex, metaWin) {
         if (monitorIndex == this.monitorIndex) {
             this._doAddWindow(metaWin);
+            this.box.restack();
         }
     },
 
     _windowLeftMonitor : function(metaScreen, monitorIndex, metaWin) {
         if (monitorIndex == this.monitorIndex) {
             this._doRemoveWindow(metaWin);
+            this.box.restack();
         }
-    },
-
-    _updateMinimized: function(metaWin) {
     },
 
     destroy : function() {            
@@ -471,17 +447,15 @@ ExpoWorkspaceThumbnail.prototype = {
     },
 
     _onDestroy: function(actor) {
+        if (this._pendingOverviewModeTimeoutId) {
+            Mainloop.source_remove(this._pendingOverviewModeTimeoutId);
+        }
         this.metaWorkspace.disconnect(this._windowAddedId);
         this.metaWorkspace.disconnect(this._windowRemovedId);
         global.screen.disconnect(this._windowEnteredMonitorId);
         global.screen.disconnect(this._windowLeftMonitorId);
 
         for (let i = 0; i < this._windows.length; i++) {
-            let metaWin = this._windows[i].metaWindow;
-            if (metaWin._minimizedChangedId) {
-                metaWin.disconnect(metaWin._minimizedChangedId);
-                delete metaWin._minimizedChangedId;
-            }
             this._windows[i].destroy();
         }
         this._windows = null;
@@ -489,13 +463,13 @@ ExpoWorkspaceThumbnail.prototype = {
 
     // Tests if @win belongs to this workspace and monitor
     _isMyWindow : function (win) {
-        return Main.isWindowActorDisplayedOnWorkspace(win, this.metaWorkspace.index()) &&
-            (!win.get_meta_window() || win.get_meta_window().get_monitor() == this.monitorIndex);
+        return Main.isWindowActorDisplayedOnWorkspace(win, this.metaWorkspace.index());
     },
 
     // Tests if @win should be shown in the Expo
     _isExpoWindow : function (win) {
-        return true;
+        let tracker = Cinnamon.WindowTracker.get_default();
+        return tracker.is_window_interesting(win.get_meta_window());
     },
 
     // Create a clone of a (non-desktop) window and add it to the window list
@@ -513,7 +487,11 @@ ExpoWorkspaceThumbnail.prototype = {
         clone.connect('drag-end',
                       Lang.bind(this, function(clone) {
                           Main.expo.endWindowDrag();
-                          this._overviewModeOff();
+                          // normal hovering monitoring was turned off during drag
+                          this.hovering = false;
+                          if (!clone.dragCancelled) {
+                              this._overviewModeOff();
+                          }
                       }));
         this._contents.add_actor(clone.actor);
         this._contents.add_actor(clone.icon);
@@ -529,33 +507,22 @@ ExpoWorkspaceThumbnail.prototype = {
         return clone;
     },
 
-    _fadeOutUninterestingWindows : function() {
-        this._uninterestingWindows.opacity = 255;
-        this._uninterestingWindows.show();
-        this._uninterestingWindows.raise(this._background);
-        Tweener.addTween(this._uninterestingWindows, {  opacity: 0,
-                                                        time: REARRANGE_TIME,
-                                                        transition: "easeOutQuad",
-                                                        onComplete: function() {this.hide();}});       
-    },
-
-    _fadeInUninterestingWindows : function() {
-        this._uninterestingWindows.opacity = 0;
-        this._uninterestingWindows.show();
-        this._uninterestingWindows.raise(this._background);
-        Tweener.addTween(this._uninterestingWindows, {  opacity: 255,
-                                                        time: REARRANGE_TIME,
-                                                        transition: "easeOutQuad",
-                                                        onComplete: function() {this.hide();}});
-    },
-
-    _addUninterestingWindowClone : function(win) {
-        let clone = new ExpoWindowClone(win);
-        this._uninterestingWindows.add_actor(clone.actor);
-        return clone;
-    },
-
     _overviewModeOn : function () {
+        if (this._pendingOverviewModeTimeoutId) {
+            return;
+        }
+        // The idea is to delay the call to the real _overviewModeOn somewhat,
+        // since this is often called at a busy moment when many things are happening.
+        // If called too soon after a drag-and-drop, the window stacking order may
+        // not have settled, just to mention one reason.
+        // There may also be many calls after another that could be coalesced into one.
+        this._pendingOverviewModeTimeoutId = Mainloop.timeout_add(
+            100,
+            Lang.bind(this, this._overviewModeOn__));
+    },
+
+    _overviewModeOn__ : function () {
+        this._pendingOverviewModeTimeoutId = null;
         this._overviewMode = true;
         let spacing = 14;
         let nCols = Math.ceil(Math.sqrt(this._windows.length));
@@ -567,8 +534,10 @@ ExpoWorkspaceThumbnail.prototype = {
         let lastRowCols = this._windows.length - ((nRows - 1) * nCols);
         let lastRowOffset = (this.actor.width - (maxWindowWidth * lastRowCols) - (spacing * (lastRowCols+1))) / 2;
         let offset = 0;
-        for (let i = this._windows.length - 1; i >= 0; --i) { // start with bottom-most
-            let window = this._windows[i];
+        let windows = this._windows.slice();
+        windows.reverse(); // top-to-bottom order
+        for (let i = 0; i < windows.length; i++){
+            let window = windows[i];
             if (!window.origSet) {
                 window.origX = window.actor.x;
                 window.origY = window.actor.y;
@@ -576,8 +545,8 @@ ExpoWorkspaceThumbnail.prototype = {
             }
             if ((window.metaWindow.maximized_horizontally &&
                 window.metaWindow.maximized_vertically) || window.metaWindow.get_layer() == Meta.StackLayer.FULLSCREEN){
-                window.origX = 0;
-                window.origY = 0;
+                window.origX = this._porthole.x;
+                window.origY = this._porthole.y
             }
 
             if (row == nRows)
@@ -585,8 +554,8 @@ ExpoWorkspaceThumbnail.prototype = {
 
             let scale = Math.min((maxWindowWidth / window.actor.width), (maxWindowHeight / window.actor.height)); 
             scale = Math.min(1, scale);
-            let x = offset + (spacing * col) + (maxWindowWidth * (col - 1)) + ((maxWindowWidth - (window.actor.width * scale)) / 2);
-            let y = (spacing * row) + (maxWindowHeight * (row - 1)) + ((maxWindowHeight - (window.actor.height * scale)) / 2);   
+            let x = this._porthole.x + offset + (spacing * col) + (maxWindowWidth * (col - 1)) + ((maxWindowWidth - (window.actor.width * scale)) / 2);
+            let y = this._porthole.y + (spacing * row) + (maxWindowHeight * (row - 1)) + ((maxWindowHeight - (window.actor.height * scale)) / 2);   
 
             if (!window.metaWindow.showing_on_its_workspace()) {
                 window.actor.set_position(window.icon.x, window.icon.y);
@@ -699,7 +668,6 @@ ExpoWorkspaceThumbnail.prototype = {
         this.emit('remove-event');
         Main._removeWorkspace(this.metaWorkspace);
         this.removed = true;
-        return true;
     },
 
     // Draggable target interface
@@ -739,6 +707,9 @@ ExpoWorkspaceThumbnail.prototype = {
         metaWindow.change_workspace_by_index(this.metaWorkspace.index(),
                                                 false, // don't create workspace
                                                 time);
+
+        // normal hovering monitoring was turned off during drag
+        this.hovering = true;
 
         this._overviewModeOn();
         return true;
@@ -800,6 +771,9 @@ ExpoThumbnailsBox.prototype = {
             global.window_manager.connect('switch-workspace',
                                           Lang.bind(this, this._activeWorkspaceChanged));
 
+        this._nWorkspacesChangedId = global.screen.connect('notify::n-workspaces',
+                                                            Lang.bind(this, this._workspacesChanged));
+
         this._targetScale = 0;
         this._scale = 0;
         this._pendingScaleUpdate = false;
@@ -810,34 +784,15 @@ ExpoThumbnailsBox.prototype = {
             this._stateCounts[ThumbnailState[key]] = 0;
 
         // The "porthole" is the portion of the screen that we show in the workspaces
-        let panelHeight = Main.panel.actor.height;
-        let monitor = Main.layoutManager.primaryMonitor;
-        let autohide = global.settings.get_boolean("panel-autohide");
-        let desktop_layout = global.settings.get_string("desktop-layout");
-        let portholeY = null;
-        let portholeHeight = null;
-        if (autohide){
-            portholeY = 0;
-            portholeHeight = monitor.height;
-        } else if (desktop_layout == "traditional"){
-            portholeY = 0;
-            portholeHeight = monitor.height - panelHeight;        
-        } else if (desktop_layout == "flipped"){
-            portholeY = panelHeight;
-            portholeHeight = monitor.height - panelHeight;     
-        } else {
-            portholeY = panelHeight;
-            portholeHeight = monitor.height - (panelHeight * 2);         
-        }
-        this._porthole = {
-            x: monitor.x,
-            y: portholeY,
-            width: monitor.width,
-            height: portholeHeight
-        };
+        this._porthole = Main.layoutManager.getPorthole();
 
         this.addThumbnails(0, global.screen.n_workspaces);
         this.button.raise_top();
+
+        this.restackedNotifyId =
+            global.screen.connect('restacked',
+                                  Lang.bind(this, this.restack));
+        this.restack();
 
         // apparently we get no direct call to show the initial
         // view, so we must force an explicit overviewModeOff display
@@ -935,14 +890,35 @@ ExpoThumbnailsBox.prototype = {
         return true; // handled
     },
 
+    restack: function() {
+        let stack = global.get_window_actors();
+        let stackIndices = {};
+
+        for (let i = 0; i < stack.length; i++) {
+            // Use the stable sequence for an integer to use as a hash key
+            stackIndices[stack[i].get_meta_window().get_stable_sequence()] = i;
+        }
+
+        this.syncStacking(stackIndices);
+    },
+
     hide: function() {
+        if (this.restackedNotifyId > 0){
+            global.screen.disconnect(this.restackedNotifyId);
+            this.restackedNotifyId = 0;
+        }
         if (this._switchWorkspaceNotifyId > 0) {
             global.window_manager.disconnect(this._switchWorkspaceNotifyId);
             this._switchWorkspaceNotifyId = 0;
         }
+        if (this._nWorkspacesChangedId > 0){
+            global.screen.disconnect(this._nWorkspacesChangedId);
+            this._nWorkspacesChangedId = 0;
+        }
 
-        for (let w = 0; w < this._thumbnails.length; w++)
+        for (let w = 0; w < this._thumbnails.length; w++) {
             this._thumbnails[w].destroy();
+        }
         this._thumbnails = [];
     },
 
@@ -962,9 +938,9 @@ ExpoThumbnailsBox.prototype = {
         }
         for (let k = start; k < start + count; k++) {
             let metaWorkspace = global.screen.get_workspace_by_index(k);
-            let thumbnail = new ExpoWorkspaceThumbnail(metaWorkspace);
-            thumbnail.setPorthole(this._porthole.x, this._porthole.y,
-                                  this._porthole.width, this._porthole.height);
+            let thumbnail = new ExpoWorkspaceThumbnail(metaWorkspace, this);
+            thumbnail.setPorthole(this._porthole);
+                                  
             this._thumbnails.push(thumbnail);
             if (metaWorkspace == global.screen.get_active_workspace()) {
                 this._lastActiveWorkspace = thumbnail;
@@ -1188,7 +1164,12 @@ ExpoThumbnailsBox.prototype = {
         let asGrid  = global.settings.get_boolean("workspace-expo-view-as-grid");
         let nColumns = asGrid ? Math.ceil(Math.sqrt(nWorkspaces)) : nWorkspaces;
         let nRows = Math.ceil(nWorkspaces/nColumns);
-        return [nColumns, nRows];
+        let ratio = Math.floor(this._porthole.width / this._porthole.height);
+        if (nWorkspaces <= ratio) {
+            return [1, nWorkspaces];
+        } else {
+            return [nColumns, nRows];
+        }
     },
 
     _getPreferredHeight: function(actor, forWidth, alloc) {
@@ -1377,6 +1358,34 @@ ExpoThumbnailsBox.prototype = {
         
         this.button.allocate(childBox, flags);
         this._lastActiveWorkspace.emit('allocated');
+    },
+
+    _workspacesChanged: function() {
+        let oldNumWorkspaces = this._thumbnails.length;
+        let newNumWorkspaces = global.screen.n_workspaces;
+        let active = global.screen.get_active_workspace_index();
+
+        if (oldNumWorkspaces == newNumWorkspaces)
+            return;
+        if (newNumWorkspaces > oldNumWorkspaces) {
+            // Assume workspaces are only added at the end
+            this.addThumbnails(oldNumWorkspaces, newNumWorkspaces - oldNumWorkspaces);
+        } else {
+            // Assume workspaces are only removed sequentially
+            // (e.g. 2,3,4 - not 2,4,7)
+            let removedIndex = -1;
+            let removedNum = oldNumWorkspaces - newNumWorkspaces;
+            for (let w = 0; w < oldNumWorkspaces; w++) {
+                let metaWorkspace = global.screen.get_workspace_by_index(w);
+                if (this._thumbnails[w].metaWorkspace != metaWorkspace) {
+                    removedIndex = w;
+                    break;
+                }
+            }
+            if (removedIndex >= 0) {
+                this.removeThumbnails(removedIndex, removedNum);
+            }
+        }
     },
 
     _activeWorkspaceChanged: function(wm, from, to, direction) {
