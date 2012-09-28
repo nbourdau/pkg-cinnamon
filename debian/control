@@ -86,7 +86,7 @@ Description: Innovative and comfortable desktop
 
 Package: cinnamon-common
 Architecture: all
-Depends: ${misc:Depends}
+Depends: ${misc:Depends}, python
 Description: Innovative and comfortable desktop (Common data files)
  Cinnamon is a desktop environment which provides advanced innovative
  features and a traditional user experience.
