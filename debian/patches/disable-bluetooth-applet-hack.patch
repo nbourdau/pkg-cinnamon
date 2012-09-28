@@ -4,7 +4,7 @@ Author: Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
 Origin: vendor
 Forwarded: https://github.com/linuxmint/Cinnamon/pull/987
 Applied-Upstream: no
-Last-Update: 2012-07-29
+Last-Update: 2012-09-28
 
 --- a/src/cinnamon-plugin.c
 +++ b/src/cinnamon-plugin.c
@@ -28,7 +28,7 @@ Last-Update: 2012-07-29
 -#endif
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
-@@ -258,7 +258,6 @@
+@@ -266,7 +266,6 @@
  libcinnamon_la_LIBADD =		\
  	-lm			\
  	$(CINNAMON_LIBS)	\
