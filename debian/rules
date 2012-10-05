@@ -15,7 +15,7 @@ ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
 endif
 
 %:
-	dh  $@ --with autoreconf
+	dh  $@ --with autoreconf,python2
 
 
 override_dh_autoreconf:
