@@ -1,0 +1,18 @@
+Generation of the DFSG compliant sources
+========================================
+
+As the time of writing (version 1.6.1), the unmodified upstream version of
+Cinnamon cannot be considered as free software under the Debian Free
+Software Guidelines (DFSG). The upstream version fails indeed to provide the
+sources of the locale files it uses (.po files) and provides only the
+compiled versions (.mo).
+
+To turn the package into DFSG compliant, it was necessary to remove the
+compiled locales under files/usr/share/cinnamon/locale and to install the
+sources into the po/ folder.
+
+However, the .po files that have been found are very outdated and as a
+result, most of the translated strings are missing.
+
+A discussion with the lead developer had lead to the agreement that he will
+provide the .po files in next versions.
