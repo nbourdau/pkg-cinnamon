@@ -11,8 +11,5 @@ To turn the package into DFSG compliant, it was necessary to remove the
 compiled locales under files/usr/share/cinnamon/locale and to install the
 sources into the po/ folder.
 
-However, the .po files that have been found are very outdated and as a
-result, most of the translated strings are missing.
-
 A discussion with the lead developer had lead to the agreement that he will
 provide the .po files in next versions.
