@@ -79,6 +79,7 @@ let _defaultCssStylesheet = null;
 let _cssStylesheet = null;
 let dynamicWorkspaces = null;
 let nWorks = null;
+let tracker = null;
 
 let workspace_names = [];
 
@@ -201,7 +202,7 @@ function start() {
     // and recalculate application associations, so to avoid
     // races for now we initialize it here.  It's better to
     // be predictable anyways.
-    Cinnamon.WindowTracker.get_default();
+    tracker = Cinnamon.WindowTracker.get_default();
     Cinnamon.AppUsage.get_default();
 
     // The stage is always covered so Clutter doesn't need to clear it; however
@@ -1078,6 +1079,21 @@ function queueDeferredWork(workId) {
     }
 }
 
+function isInteresting(metaWindow) {
+    if (tracker.is_window_interesting(metaWindow)) {
+        // The nominal case.
+        return true;
+    }
+    // The rest of this function is devoted to discovering "orphan" windows
+    // (dialogs without an associated app, e.g., the Logout dialog).
+    if (tracker.get_window_app(metaWindow)) {
+        // orphans don't have an app!
+        return false;
+    }    
+    let type = metaWindow.get_window_type();
+    return type === Meta.WindowType.DIALOG || type === Meta.WindowType.MODAL_DIALOG;
+}
+
 /**
  * getTabList:
  * @workspaceOpt (optional) workspace, defaults to global.screen.get_active_workspace()
@@ -1091,40 +1107,22 @@ function getTabList(workspaceOpt, screenOpt) {
     let screen = screenOpt || global.screen;
     let display = screen.get_display();
     let workspace = workspaceOpt || screen.get_active_workspace();
-    
+
     let windows = []; // the array to return
 
-    // Run a pass through the NORMAL tablist. We only record the identity 
-    // of each window at this point.
-    let normalLookup = {};
-    let normalWindows = display.get_tab_list(Meta.TabList.NORMAL, screen,
-                                       workspace);
-    for (let i = 0; i < normalWindows.length; ++i) {
-        let window = normalWindows[i];
-        normalLookup[window.get_stable_sequence()] = 1;
-    }
-
-    // Run a pass through the NORMAL_ALL tablist.
-    // The purpose is to find "orphan" windows that would otherwise be
-    // difficult to navigate to when lost behind other windows.
-    // The purpose of adding all windows in the same loop is to preserve
-    // the correct tab order.
     let allwindows = display.get_tab_list(Meta.TabList.NORMAL_ALL, screen,
                                        workspace);
     let registry = {}; // to avoid duplicates
-    let tracker = Cinnamon.WindowTracker.get_default();
+
     for (let i = 0; i < allwindows.length; ++i) {
         let window = allwindows[i];
-        let seqno = window.get_stable_sequence();
-        // Add "normal" windows and those that don't have an "app".
-        if (normalLookup[seqno] === 1 || !tracker.get_window_app(window))
-        {
+        if (isInteresting(window)) {
+            let seqno = window.get_stable_sequence();
             if (!registry[seqno]) {
                 windows.push(window);
-                registry[seqno] = true;
+                registry[seqno] = true; // there may be duplicates in the list (rare)
             }
         }
     }
     return windows;
 }
-
