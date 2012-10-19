@@ -22,7 +22,7 @@
     </key>
     
     <key name="enabled-applets" type="as">
-      <default>['panel1:left:0:menu@cinnamon.org', 'panel1:left:1:show-desktop@cinnamon.org', 'panel1:left:2:panel-launchers@cinnamon.org', 'panel1:left:3:window-list@cinnamon.org', 'panel1:right:0:removable-drives@cinnamon.org', 'panel1:right:1:keyboard@cinnamon.org', 'panel1:right:2:bluetooth@cinnamon.org', 'panel1:right:3:network@cinnamon.org', 'panel1:right:4:sound@cinnamon.org', 'panel1:right:5:power@cinnamon.org', 'panel1:right:6:systray@cinnamon.org', 'panel1:right:7:calendar@cinnamon.org', 'panel1:right:8:windows-quick-list@cinnamon.org']</default>
+      <default>['panel1:left:0:menu@cinnamon.org', 'panel1:left:1:show-desktop@cinnamon.org', 'panel1:left:2:panel-launchers@cinnamon.org', 'panel1:left:3:window-list@cinnamon.org', 'panel1:right:0:notifications@cinnamon.org', 'panel1:right:1:settings@cinnamon.org', 'panel1:right:2:removable-drives@cinnamon.org', 'panel1:right:3:keyboard@cinnamon.org', 'panel1:right:4:bluetooth@cinnamon.org', 'panel1:right:5:network@cinnamon.org', 'panel1:right:6:sound@cinnamon.org', 'panel1:right:7:power@cinnamon.org', 'panel1:right:8:systray@cinnamon.org', 'panel1:right:9:calendar@cinnamon.org', 'panel1:right:10:windows-quick-list@cinnamon.org']</default>
       <_summary>Uuids of applets to enable</_summary>
       <_description>
         Cinnamon applets have a uuid property; this key lists applets
@@ -237,9 +237,9 @@
     
     <key name="date-format" type="s">
       <default>"YYYY-MM-DD"</default>
-      <_summary>Auto-hide panel</_summary>
+      <_summary>Date format</_summary>
       <_description>
-        Whether the panel autohides or not.
+        Format used for dates.
       </_description>
     </key>
     
@@ -473,7 +473,7 @@
     </key>
 
     <key name="alttab-switcher-style" type="s">
-      <default>"icons"</default>
+      <default>"icons+thumbnails"</default>
       <_summary>ALT-tab switcher style</_summary>
       <_description>
        Controls the style of the ALT-tab window switcher. Can be any combination of "icons", "preview" and "thumbnails", separated by "+".
