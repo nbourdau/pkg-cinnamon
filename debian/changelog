@@ -1,3 +1,9 @@
+cinnamon (1.6.2-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.hu>  Fri, 19 Oct 2012 17:01:09 +0200
+
 cinnamon (1.6.1+dfsg-1) unstable; urgency=low
 
   * Initial release. (Closes: #657395)
