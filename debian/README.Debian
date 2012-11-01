@@ -1,5 +1,5 @@
-Generation of the DFSG compliant sources
-========================================
+Repacking the source package
+============================
 
 Upstream ships and use a compiled version of the translation files (.mo
 files) compiled by Launchpad instead of rebuilding them from the sources
