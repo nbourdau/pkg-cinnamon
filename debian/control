@@ -53,7 +53,7 @@ Vcs-Browser: https://github.com/nbourdau/pkg-cinnamon
 Homepage: http://cinnamon.linuxmint.com
 
 Package: cinnamon
-Architecture: any
+Architecture: linux-any
 Pre-Depends: ${misc:Pre-Depends}
 Depends: ${gir:Depends},
          ${shlibs:Depends},
@@ -105,7 +105,7 @@ Description: Innovative and comfortable desktop (Common data files)
 Package: cinnamon-dbg
 section: debug
 Priority: extra
-Architecture: any
+Architecture: linux-any
 Depends: cinnamon (= ${binary:Version}), ${misc:Depends}
 Description: Innovative and comfortable desktop (Debugging symbols)
  Cinnamon is a desktop environment which provides advanced innovative
