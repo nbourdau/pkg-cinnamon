@@ -1,4 +1,4 @@
 version=3
 opts="dversionmangle=s/\+repack//;s/\+dfsg//;s/\+up[0-9]//" \
-  http://githubredir.debian.net/github/linuxmint/cinnamon/(\d[\.\d]+).tar.gz \
+  https://github.com/linuxmint/Cinnamon/tags .*/v?(\d.*)\.(?:tgz|tar\.(?:gz|bz2|xz)) \
   debian sh debian/repack.stub
