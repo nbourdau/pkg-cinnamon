@@ -1,6 +1,6 @@
 Source: cinnamon
-Section: x11
-Priority: optional
+Section: misc
+Priority: extra
 Maintainer: Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
 Uploaders: Laszlo Boszormenyi (GCS) <gcs@debian.hu>
 Build-Depends: debhelper (>= 9),
@@ -103,7 +103,6 @@ Description: Innovative and comfortable desktop (Common data files)
 
 Package: cinnamon-dbg
 section: debug
-Priority: extra
 Architecture: linux-any
 Depends: cinnamon (= ${binary:Version}), ${misc:Depends}
 Description: Innovative and comfortable desktop (Debugging symbols)
