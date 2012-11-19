@@ -1,3 +1,14 @@
+cinnamon (1.6.2-2) unstable; urgency=low
+
+  * Remove the useless dependency of cinnamon on cups-pk-helper
+  * Update debian/watch: stop using redirector (thanks to Bart Martens)
+  * Add libgl1-mesa-dev as build depends: should fix build on ARM
+  * Mark cinnamon package as linux-any
+  * Change to priority extra and section misc: this reflects in debian/control
+    the changes made by FTPmaster in the archives.
+
+ -- Nicolas Bourdaud <nicolas.bourdaud@gmail.com>  Mon, 19 Nov 2012 22:52:09 +0100
+
 cinnamon (1.6.2-1) unstable; urgency=low
 
   * Initial release. (Closes: #657395)
