@@ -6,8 +6,9 @@ cinnamon (1.6.2-2) unstable; urgency=low
   * Mark cinnamon package as linux-any
   * Change to priority extra and section misc: this reflects in debian/control
     the changes made by FTPmaster in the archives.
+  * Add python-dbus and python-imaging dependencies. (Closes: #693935)
 
- -- Nicolas Bourdaud <nicolas.bourdaud@gmail.com>  Mon, 19 Nov 2012 22:52:09 +0100
+ -- Nicolas Bourdaud <nicolas.bourdaud@gmail.com>  Fri, 30 Nov 2012 17:39:25 +0100
 
 cinnamon (1.6.2-1) unstable; urgency=low
 
