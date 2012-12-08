@@ -1,0 +1,73 @@
+Description: Fix scripts to expect translation files in the standard folder
+Author: Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
+Origin: vendor
+Forwarded: no
+Applied-Upstream: no
+Last-Update: 2012-12-08
+
+--- a/files/generate_desktop_files
++++ b/files/generate_desktop_files
+@@ -26,12 +26,12 @@
+ """)
+ 
+ import gettext
+-gettext.install("cinnamon", "/usr/share/cinnamon/locale")
++gettext.install("cinnamon", "/usr/share/locale")
+ 
+-for directory in os.listdir("/usr/share/cinnamon/locale"):
+-	if os.path.isdir(os.path.join("/usr/share/cinnamon/locale", directory)):
++for directory in os.listdir("/usr/share/locale"):
++	if os.path.isdir(os.path.join("/usr/share/locale", directory)):
+ 		try:
+-			language = gettext.translation('cinnamon-settings', "/usr/share/cinnamon/locale", languages=[directory])
++			language = gettext.translation('cinnamon-settings', "/usr/share/locale", languages=[directory])
+ 			language.install()
+ 			desktopFile.writelines("Name[%s]=%s\n" % (directory, _(menuName)))
+ 		except:
+@@ -39,10 +39,10 @@
+ 
+ desktopFile.writelines("Comment=Fine-tune Cinnamon settings\n")
+ 
+-for directory in os.listdir("/usr/share/cinnamon/locale"):
+-	if os.path.isdir(os.path.join("/usr/share/cinnamon/locale", directory)):
++for directory in os.listdir("/usr/share/locale"):
++	if os.path.isdir(os.path.join("/usr/share/locale", directory)):
+ 		try:
+-			language = gettext.translation('cinnamon-settings', "/usr/share/cinnamon/locale", languages=[directory])
++			language = gettext.translation('cinnamon-settings', "/usr/share/locale", languages=[directory])
+ 			language.install()			
+ 			desktopFile.writelines("Comment[%s]=%s\n" % (directory, _(menuComment)))
+ 		except:
+--- a/files/usr/lib/cinnamon-settings/cinnamon-settings.py
++++ b/files/usr/lib/cinnamon-settings/cinnamon-settings.py
+@@ -30,7 +30,7 @@
+ 
+ 
+ # i18n
+-gettext.install("cinnamon", "/usr/share/cinnamon/locale")
++gettext.install("cinnamon", "/usr/share/locale")
+ 
+ # i18n for menu item
+ menuName = _("Desktop Settings")
+--- a/files/usr/share/cinnamon/applets/panel-launchers@cinnamon.org/add-panel-launcher.py
++++ b/files/usr/share/cinnamon/applets/panel-launchers@cinnamon.org/add-panel-launcher.py
+@@ -11,7 +11,7 @@
+ import sys
+ import gettext
+ 
+-gettext.install("cinnamon", "/usr/share/cinnamon/locale")
++gettext.install("cinnamon", "/usr/share/locale")
+ Settings = Gio.Settings.new("org.cinnamon")
+ 
+ _ = gettext.gettext
+--- a/js/ui/main.js
++++ b/js/ui/main.js
+@@ -98,7 +98,7 @@
+ 
+ // Override Gettext localization
+ const Gettext = imports.gettext;
+-Gettext.bindtextdomain('cinnamon', '/usr/share/cinnamon/locale');
++Gettext.bindtextdomain('cinnamon', '/usr/share/locale');
+ Gettext.textdomain('cinnamon');
+ const _ = Gettext.gettext;
+ 

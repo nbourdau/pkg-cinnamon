@@ -6,6 +6,8 @@ cinnamon (1.6.2-2) unstable; urgency=low
   * Mark cinnamon package as linux-any
   * Add python-dbus and python-imaging dependencies. (Closes: #693935)
   * Do not install browser plugin in multiarch folder. (Closes: #695338) 
+  * Install translation files in the standard folder. (Closes: #695286)
+    new patch: fix-gettext-files-path.patch
 
  -- Nicolas Bourdaud <nicolas.bourdaud@gmail.com>  Fri, 30 Nov 2012 17:39:25 +0100
 
