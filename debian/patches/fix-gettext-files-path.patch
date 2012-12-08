@@ -49,17 +49,6 @@ Last-Update: 2012-12-08
  
  # i18n for menu item
  menuName = _("Desktop Settings")
---- a/files/usr/share/cinnamon/applets/panel-launchers@cinnamon.org/add-panel-launcher.py
-+++ b/files/usr/share/cinnamon/applets/panel-launchers@cinnamon.org/add-panel-launcher.py
-@@ -11,7 +11,7 @@
- import sys
- import gettext
- 
--gettext.install("cinnamon", "/usr/share/cinnamon/locale")
-+gettext.install("cinnamon", "/usr/share/locale")
- Settings = Gio.Settings.new("org.cinnamon")
- 
- _ = gettext.gettext
 --- a/js/ui/main.js
 +++ b/js/ui/main.js
 @@ -98,7 +98,7 @@
@@ -71,3 +60,14 @@ Last-Update: 2012-12-08
  Gettext.textdomain('cinnamon');
  const _ = Gettext.gettext;
  
+--- a/files/usr/share/cinnamon/applets/panel-launchers@cinnamon.org/cinnamon-add-panel-launcher.py
++++ b/files/usr/share/cinnamon/applets/panel-launchers@cinnamon.org/cinnamon-add-panel-launcher.py
+@@ -11,7 +11,7 @@
+ import sys
+ import gettext
+ 
+-gettext.install("cinnamon", "/usr/share/cinnamon/locale")
++gettext.install("cinnamon", "/usr/share/locale")
+ Settings = Gio.Settings.new("org.cinnamon")
+ 
+ _ = gettext.gettext
