@@ -1,5 +1,8 @@
 /usr/bin
 /usr/lib
-/usr/share/applications
+/usr/share/applications/cinnamon.desktop
+/usr/share/applications/cinnamon2d.desktop
+/usr/share/applications/cinnamon-settings.desktop
+/usr/share/applications/cinnamon-menu-editor.desktop
 /usr/share/dbus-1
 /usr/share/man
