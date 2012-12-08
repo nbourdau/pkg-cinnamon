@@ -771,8 +771,9 @@ class BackgroundSidePage (SidePage):
 
         expander = Gtk.Expander()
         expander.set_label(_("Advanced options"))
-        scrolled_window.add_with_viewport(expander)
+        
         self.content_box.pack_start(scrolled_window, False, True, 0)
+        self.content_box.pack_start(expander, False, True, 0)
         
         advanced_options_box = Gtk.HBox()
         expander.add(advanced_options_box)
@@ -1586,7 +1587,12 @@ class KeyboardSidePage (SidePage):
         entry_cell.connect('accel-edited', self.onEntryChanged, self.entry_store)
         entry_cell.connect('accel-cleared', self.onEntryCleared, self.entry_store)
         entry_cell.set_property('editable', True)
-        entry_cell.set_property('accel-mode', Gtk.CellRendererAccelMode.MODIFIER_TAP)
+
+        try:  # Only Ubuntu allows MODIFIER_TAP - using a single modifier as a keybinding
+            entry_cell.set_property('accel-mode', Gtk.CellRendererAccelMode.MODIFIER_TAP)
+        except Exception:  # Pure GTK does not, so use OTHER
+            entry_cell.set_property('accel-mode', Gtk.CellRendererAccelMode.OTHER)
+
         entry_column = Gtk.TreeViewColumn(_("Keyboard bindings"), entry_cell, text=0)
         entry_column.set_alignment(.5)
         self.entry_tree.append_column(entry_column)
@@ -1594,7 +1600,7 @@ class KeyboardSidePage (SidePage):
         self.main_store = []
 
         # categories                                Display name        internal category
-        self.main_store.append(KeyBindingCategory(_("Cinnamon"), "cinnamon"))
+        self.main_store.append(KeyBindingCategory("Cinnamon", "cinnamon"))
         self.main_store.append(KeyBindingCategory(_("Windows"), "windows"))
         self.main_store.append(KeyBindingCategory(_("Workspace Management"), "ws-manage"))
         self.main_store.append(KeyBindingCategory(_("System"), "system"))
@@ -2880,6 +2886,7 @@ class MainWindow:
         alttab_styles_combo = GSettingsComboBox(_("ALT-tab switcher style"), "org.cinnamon", "alttab-switcher-style", None, alttab_styles)
         sidePage.add_widget(alttab_styles_combo)
         sidePage.add_widget(GSettingsCheckButton(_("Enable mouse-wheel scrolling in Window List applet"), "org.cinnamon", "window-list-applet-scroll", None))
+        sidePage.add_widget(GSettingsCheckButton(_("Bring windows which require attention to the current workspace (instead of switching to the window's workspace)"), "org.cinnamon", "bring-windows-to-current-workspace", None))
         
         sidePage = SidePage(_("Workspaces"), "workspaces.svg", self.content_box)
         self.sidePages.append((sidePage, "workspaces"))        

@@ -1195,7 +1195,7 @@ MyApplet.prototype = {
                 favoritesBox.actor.add_actor(button.actor, { y_align: St.Align.END, y_fill: false });
                 button.actor.connect('enter-event', Lang.bind(this, function() {
                    this.selectedAppTitle.set_text(button.app.get_name());
-                   if (button.app.get_description()) this.selectedAppDescription.set_text(button.app.get_description());
+                   if (button.app.get_description()) this.selectedAppDescription.set_text(button.app.get_description().split("\n")[0]);
                    else this.selectedAppDescription.set_text("");
                 }));
                 button.actor.connect('leave-event', Lang.bind(this, function() {
@@ -1283,8 +1283,8 @@ MyApplet.prototype = {
                         applicationButton.actor.connect('leave-event', Lang.bind(this, this._appLeaveEvent, applicationButton));
                         this._addEnterEvent(applicationButton, Lang.bind(this, this._appEnterEvent, applicationButton));
                         this._applicationsButtons.push(applicationButton);
-                        applicationButton.category.push(dir.get_menu_id());
-                        this.applicationsByCategory[dir.get_menu_id()].push(app.get_name());
+                        applicationButton.category.push(top_dir.get_menu_id());
+                        this.applicationsByCategory[top_dir.get_menu_id()].push(app.get_name());
                     } else {
                         for (let i = 0; i < this._applicationsButtons.length; i++) {
                             if (this._applicationsButtons[i].app == app) {
@@ -1376,7 +1376,11 @@ MyApplet.prototype = {
         rightPane.add_actor(this.categoriesApplicationsBox.actor);
         this.categoriesBox = new St.BoxLayout({ style_class: 'menu-categories-box', vertical: true });
         this.applicationsScrollBox = new St.ScrollView({ x_fill: true, y_fill: false, y_align: St.Align.START, style_class: 'vfade menu-applications-scrollbox' });
-        
+
+        this.a11y_settings = new Gio.Settings({ schema: "org.gnome.desktop.a11y.applications" });
+        this.a11y_settings.connect("changed::screen-magnifier-enabled", Lang.bind(this, this._updateVFade));
+        this._updateVFade();
+
         let vscroll = this.applicationsScrollBox.get_vscroll_bar();
         vscroll.connect('scroll-start',
                         Lang.bind(this, function() {
@@ -1420,6 +1424,15 @@ MyApplet.prototype = {
         }));
     },
 
+    _updateVFade: function() {
+        let mag_on = this.a11y_settings.get_boolean("screen-magnifier-enabled");
+        if (mag_on) {
+            this.applicationsScrollBox.style_class = "menu-applications-scrollbox";
+        } else {
+            this.applicationsScrollBox.style_class = "vfade menu-applications-scrollbox";
+        }
+    },
+
     _clearAllSelections: function() {
         let actors = this.applicationsBox.get_children();
         for (var i=0; i<actors.length; i++) {
@@ -1457,7 +1470,7 @@ MyApplet.prototype = {
     _onApplicationButtonRealized: function(actor) {
         if (actor.get_width() > this._applicationsBoxWidth){
             this._applicationsBoxWidth = actor.get_width();
-            this.applicationsBox.set_width(this._applicationsBoxWidth);
+            this.applicationsBox.set_width(this._applicationsBoxWidth + 20);
         }
     },
     
@@ -1643,14 +1656,12 @@ MyApplet.prototype = {
             applist = "all";
         }
         let res;
-        if (pattern) {
-            pattern = pattern.toLowerCase();
+        if (pattern){
             res = new Array();
             for (var i in this._applicationsButtons) {
                 let app = this._applicationsButtons[i].app;
-                if (app.get_name().toLowerCase().indexOf(pattern)!=-1 || (app.get_description() && app.get_description().toLowerCase().indexOf(pattern)!=-1)) {
-                    res.push(app.get_name());
-                }
+                if (app.get_name().toLowerCase().indexOf(pattern)!=-1 || (app.get_description() && app.get_description().toLowerCase().indexOf(pattern)!=-1) ||
+                        (app.get_id() && app.get_id().slice(0, -8).toLowerCase().indexOf(pattern)!=-1)) res.push(app.get_name());
             }
         } else res = applist;
         return res;
