@@ -3,7 +3,7 @@ Author: Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
 Origin: vendor
 Forwarded: no
 Applied-Upstream: no
-Last-Update: 2012-12-08
+Last-Update: 2012-12-10
 
 --- a/files/generate_desktop_files
 +++ b/files/generate_desktop_files
@@ -71,3 +71,14 @@ Last-Update: 2012-12-08
  Settings = Gio.Settings.new("org.cinnamon")
  
  _ = gettext.gettext
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -80,7 +80,7 @@
+ 	$(CINNAMON_CFLAGS)			\
+ 	-I$(srcdir)/tray			\
+ 	-DVERSION=\"$(VERSION)\"		\
+-	-DLOCALEDIR=\"$(datadir)/cinnamon/locale\" 	\
++	-DLOCALEDIR=\"$(datadir)/locale\" 	\
+ 	-DDATADIR=\"$(datadir)\"		\
+ 	-DCINNAMON_LIBEXECDIR=\"$(libexecdir)\"	\
+ 	-DCINNAMON_DATADIR=\"$(pkgdatadir)\"	\
