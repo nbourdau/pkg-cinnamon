@@ -29,12 +29,13 @@ Last-Update: 2012-12-10
 -#endif
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
-@@ -262,11 +262,10 @@
- 	rm -f $(@F).tmp
+@@ -263,10 +263,12 @@
  EXTRA_DIST += cinnamon-enum-types.c.in
  
--libcinnamon_la_LDFLAGS = -avoid-version
-+libcinnamon_la_LDFLAGS = -avoid-version -Wl,-rpath=/usr/lib/gnome-bluetooth
+ libcinnamon_la_LDFLAGS = -avoid-version
++if BUILD_WITH_BLUETOOTH
++libcinnamon_la_LDFLAGS += -Wl,-rpath=$(BLUETOOTH_DIR)
++endif
  libcinnamon_la_LIBADD =		\
  	-lm			\
  	$(CINNAMON_LIBS)	\
@@ -42,3 +43,18 @@ Last-Update: 2012-12-10
  	libst-1.0.la       	\
  	libtray.la		\
  	libgvc.la		\
+--- a/configure.ac
++++ b/configure.ac
+@@ -121,10 +121,12 @@
+ 	 AC_DEFINE_UNQUOTED([BLUETOOTH_DIR],["$BLUETOOTH_DIR"],[Path to installed GnomeBluetooth typelib and library])
+ 	 AC_DEFINE([HAVE_BLUETOOTH],[1],[Define if you have libgnome-bluetooth-applet])
+ 	 AC_SUBST([HAVE_BLUETOOTH],[1])
++	 build_with_bluetooth=true;
+ 	 AC_MSG_RESULT([yes])],
+ 	[AC_DEFINE([HAVE_BLUETOOTH],[0])
+ 	 AC_SUBST([HAVE_BLUETOOTH],[0])
+ 	 AC_MSG_RESULT([no])])
++AM_CONDITIONAL([BUILD_WITH_BLUETOOTH], [test "x$build_with_bluetooth" = xtrue])
+ 
+ MUFFIN_GIR_DIR=`$PKG_CONFIG --variable=girdir libmuffin`
+ MUFFIN_TYPELIB_DIR=`$PKG_CONFIG --variable=typelibdir libmuffin`
