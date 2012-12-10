@@ -11,6 +11,8 @@ cinnamon (1.6.7-1) UNRELEASED; urgency=low
   * Install translation files in the standard folder. (Closes: #695286)
     new patch: fix-gettext-files-path.patch
   * Move packaging git repo to Alioth. 
+  * Use rpath to fix the use of libgnome-bluetooth. (Closes: #695408)
+     - update: disable-bluetooth-applet-hack.patch
 
  -- Nicolas Bourdaud <nicolas.bourdaud@gmail.com>  Fri, 30 Nov 2012 17:39:25 +0100
 

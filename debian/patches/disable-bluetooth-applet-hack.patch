@@ -1,10 +1,11 @@
 Description: Disable bluetooth applet hack
- The hack prevent the Debian package to build properly.
+ The hack prevent the Debian package to build properly. Modify it into a
+ simple rpath addition in libcinnamon.so.
 Author: Nicolas Bourdaud <nicolas.bourdaud@gmail.com>
 Origin: vendor
 Forwarded: https://github.com/linuxmint/Cinnamon/pull/987
 Applied-Upstream: no
-Last-Update: 2012-09-28
+Last-Update: 2012-12-10
 
 --- a/src/cinnamon-plugin.c
 +++ b/src/cinnamon-plugin.c
@@ -28,7 +29,12 @@ Last-Update: 2012-09-28
 -#endif
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
-@@ -266,7 +266,6 @@
+@@ -262,11 +262,10 @@
+ 	rm -f $(@F).tmp
+ EXTRA_DIST += cinnamon-enum-types.c.in
+ 
+-libcinnamon_la_LDFLAGS = -avoid-version
++libcinnamon_la_LDFLAGS = -avoid-version -Wl,-rpath=/usr/lib/gnome-bluetooth
  libcinnamon_la_LIBADD =		\
  	-lm			\
  	$(CINNAMON_LIBS)	\
