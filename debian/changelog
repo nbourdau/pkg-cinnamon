@@ -1,7 +1,7 @@
 cinnamon (1.6.7-1) UNRELEASED; urgency=low
 
   * New upstream cinnamon_1.6.7
-     - Fix keyboard settings applet. (Closes: #695408)
+     - Fix keyboard settings applet. (Closes: #695217)
   * Remove the useless dependency of cinnamon on cups-pk-helper
   * Update debian/watch: stop using redirector (thanks to Bart Martens)
   * Add libgl1-mesa-dev as build depends: should fix build on ARM
