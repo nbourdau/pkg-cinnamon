@@ -10,6 +10,7 @@ cinnamon (1.6.7-1) UNRELEASED; urgency=low
   * Do not install browser plugin in multiarch folder. (Closes: #695338) 
   * Install translation files in the standard folder. (Closes: #695286)
     new patch: fix-gettext-files-path.patch
+  * Move packaging git repo to Alioth. 
 
  -- Nicolas Bourdaud <nicolas.bourdaud@gmail.com>  Fri, 30 Nov 2012 17:39:25 +0100
 
